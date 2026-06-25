@@ -1,22 +1,53 @@
 @import "tailwindcss";
 
+/* ============================================================
+   GitFut Design System — WC26 luxury spine × GitHub green action
+   The keystone module: every screen reads from these tokens.
+   ============================================================ */
 @theme {
-  --font-display: var(--font-saira);
-  --font-sans: var(--font-hanken);
+  --font-display: var(--font-bebas);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
 
-  --color-bg: #0b0a0f;
-  --color-brand: #ff4d5e;
-  --color-brand-hi: #ff6473;
-  --color-ink: #edeaf2;
-  --color-ink-dim: #cfc9da;
-  --color-ink-soft: #a39db2;
-  --color-ink-faint: #8a8499;
-  --color-ink-mute: #6b6577;
-  --color-panel: #100e16;
+  /* WC26 spine — black / surfaces / gray / ink / gold */
+  --color-bg: #0d1117;
+  --color-bg-deep: #010409;
+  --color-panel: #161b22;
+  --color-surface: #161b22;
+  --color-surface-2: #21262d;
+  --color-line: #30363d;
+  --color-gray: #8b949e;
 
-  --animate-flood: flood 14s ease-in-out infinite alternate;
-  --animate-card-reveal: card-reveal 0.7s cubic-bezier(0.2, 0.85, 0.25, 1);
+  --color-ink: #e6edf3;
+  --color-ink-dim: #c9d1d9;
+  --color-ink-soft: #a8b3bd;
+  --color-ink-faint: #8b949e;
+  --color-ink-mute: #6e7681;
+
+  /* GitHub green — "the action" */
+  --color-brand: #39d353;
+  --color-brand-hi: #56e06b;
+  --color-brand-mid: #26a641;
+  --color-brand-deep: #006d32;
+
+  /* WC26 gold — prestige metal (reserved) */
+  --color-gold: #d4af37;
+  --color-gold-hi: #e9cc74;
+  --color-gold-deep: #b48811;
+
+  /* motion */
+  --animate-flood: flood 18s ease-in-out infinite alternate;
   --animate-glow: glow 3.4s ease-in-out infinite;
+  --animate-card-reveal: rise-soft 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-walkout: walkout 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-rise-soft: rise-soft 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-spotlight: spotlight 1.1s ease-out both;
+  --animate-pun-in: pun-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-juggle: juggle 1.4s ease-in-out infinite;
+  --animate-ball-spin: ball-spin 1.4s linear infinite;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-float: float 5s ease-in-out infinite;
+  --animate-pop: pop 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @layer base {
@@ -32,7 +63,7 @@
   }
   ::selection {
     background: var(--color-brand);
-    color: #fff;
+    color: #04130a;
   }
   ::placeholder {
     color: var(--color-ink-mute);
@@ -41,30 +72,183 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+  /* Bebas is all-caps by nature; keep its tracking honest */
+  .font-display {
+    letter-spacing: 0.01em;
+  }
 }
 
+/* ---- background flood ---- */
 @keyframes flood {
   0% {
-    transform: translate(-52%, 0);
+    transform: translate(-52%, -2%);
   }
   100% {
-    transform: translate(-48%, 0);
+    transform: translate(-48%, 2%);
   }
 }
-@keyframes card-reveal {
-  0% {
-    transform: translateY(12px) scale(0.955);
-  }
-  100% {
-    transform: translateY(0) scale(1);
-  }
-}
+
+/* ---- result card ambient glow pulse ---- */
 @keyframes glow {
   0%,
   100% {
-    opacity: 0.55;
+    opacity: 0.5;
   }
   50% {
     opacity: 0.85;
+  }
+}
+
+/* ---- THE WALKOUT: card rises out of darkness into the spotlight ---- */
+@keyframes walkout {
+  0% {
+    transform: translateY(46px) scale(0.9);
+    opacity: 0;
+    filter: brightness(0.4) saturate(0.6);
+  }
+  55% {
+    opacity: 1;
+  }
+  70% {
+    filter: brightness(1.25) saturate(1.1);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
+}
+
+@keyframes rise-soft {
+  0% {
+    transform: translateY(22px) scale(0.96);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* spotlight beam bloom behind the card on reveal */
+@keyframes spotlight {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scaleY(0.4);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.85;
+    transform: translateX(-50%) scaleY(1);
+  }
+}
+
+/* loading pun line entrance */
+@keyframes pun-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* mascot juggling the ball */
+@keyframes juggle {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(2deg);
+  }
+}
+@keyframes ball-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* gold shimmer sweep for prestige accents */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* tier underline draws out from center under the scout-report name */
+@keyframes gf-underline {
+  0% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+/* one-shot tier-accent shimmer sweep across the scout-report name on appear */
+@keyframes gf-name-shimmer {
+  0% {
+    background-position: 130% 0;
+  }
+  60%,
+  100% {
+    background-position: -20% 0;
+  }
+}
+
+/* popover entrance — country picker dropdown rises + fades in from its anchor */
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* gentle float for hero card/mascot */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* contribution-graph shimmer used as a brand motif */
+.gf-grid-cell {
+  animation: gf-cell var(--gf-dur, 3s) ease-in-out infinite;
+}
+@keyframes gf-cell {
+  0%,
+  100% {
+    opacity: 0.18;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 }
