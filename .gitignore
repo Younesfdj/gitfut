@@ -39,8 +39,13 @@ yarn-error.log*
 # claude
 .claude
 
+# impeccable live-design tool state
+.impeccable
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 .vercel
+design/
+scripts/

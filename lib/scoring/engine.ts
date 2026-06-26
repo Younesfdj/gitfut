@@ -1,4 +1,5 @@
 import { countryFromLocation } from "../geo";
+import { topLanguageLogo } from "../github/languages";
 import { deriveMetrics, deriveSkillMoves, deriveStyle, deriveWeakFoot, deriveWorkRate } from "./attributes";
 import { FINISH_LABELS, K, STATS, WEIGHTS } from "./constants";
 import { derivePlaystyles } from "./playstyles";
@@ -170,6 +171,8 @@ export function buildCard(s: Signals): Card {
   const weak = deriveWeakFoot(stats);
   const work = deriveWorkRate(stats);
   const style = deriveStyle(s);
+  // Most-used language → catalog logo (walks past languages without one).
+  const languageLogo = topLanguageLogo(s.rankedLanguages ?? []);
   return {
     login: s.login,
     name: s.name,
@@ -185,6 +188,8 @@ export function buildCard(s: Signals): Card {
     finishLabel: FINISH_LABELS[finish],
     archetype: archetype.name,
     archetypeBlurb: archetype.blurb,
+    topLanguage: s.topLanguage ?? null,
+    languageLogo,
     legacy: { L },
     report: {
       skillMoves: skill.value,

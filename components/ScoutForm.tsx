@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
+import Mascot from "./Mascot";
 
 interface Props {
   loading: boolean;
@@ -11,7 +12,7 @@ interface Props {
 }
 
 const exampleClass =
-  "cursor-pointer text-ink-soft underline underline-offset-[3px]";
+  "cursor-pointer font-mono text-ink-soft underline decoration-brand/40 underline-offset-[3px] transition hover:text-brand";
 
 export default function ScoutForm({
   loading,
@@ -28,35 +29,52 @@ export default function ScoutForm({
 
   return (
     <div className="min-w-0 flex-1">
-      <h1 className="font-display m-0 mb-4 text-[clamp(46px,6.6vw,94px)] font-black leading-[.86] tracking-[-.02em]">
+      {/* mascot — the brand face on the hero */}
+      <div className="mb-1 -ml-2 max-[860px]:mx-auto max-[860px]:flex max-[860px]:justify-center">
+        <Mascot size={150} />
+      </div>
+
+      <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand/25 bg-brand/10 px-3 py-1 text-[11.5px] font-semibold tracking-wide text-brand max-[860px]:mx-auto">
+        <span className="h-[6px] w-[6px] animate-pulse rounded-full bg-brand shadow-[0_0_8px_var(--color-brand)]" />
+        GITHUB × WORLD CUP 26
+      </div>
+
+      <h1 className="font-display m-0 mb-3 text-[clamp(52px,7vw,104px)] leading-[.82] tracking-[.005em]">
         GET SCOUTED<span className="text-brand">.</span>
       </h1>
-      <p className="mb-[26px] max-w-[400px] text-[clamp(15px,1.7vw,19px)] font-semibold leading-[1.45] text-ink-dim">
-        Your GitHub stats, turned into a FUT-style player card rated out of 99.
+      <p className="mb-[26px] max-w-[420px] text-[clamp(15px,1.7vw,18px)] font-medium leading-[1.5] text-ink-dim max-[860px]:mx-auto">
+        Your GitHub stats, turned into a World-Cup-style player card rated out
+        of 99.
       </p>
 
       <form
         onSubmit={submit}
-        className="m-0 flex max-w-[440px] flex-wrap gap-[10px] max-[860px]:mx-auto"
+        className="m-0 flex max-w-[460px] flex-wrap gap-[10px] max-[860px]:mx-auto"
       >
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="GitHub username"
-          autoComplete="off"
-          spellCheck={false}
-          className="font-sans h-14 min-w-[190px] flex-1 rounded-[13px] border-[1.5px] border-white/15 bg-[rgba(13,11,20,.66)] px-5 text-[17px] font-semibold text-white outline-none backdrop-blur-[4px] transition focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,77,94,.16),0_0_38px_rgba(255,77,94,.22)]"
-        />
+        <div className="relative min-w-[200px] flex-1">
+          <span className="font-mono pointer-events-none absolute left-[18px] top-1/2 -translate-y-1/2 text-[17px] font-semibold text-brand/70"></span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="github username"
+            autoComplete="off"
+            spellCheck={false}
+            aria-label="GitHub username"
+            className="font-mono h-14 w-full rounded-[14px] border-[1.5px] border-line bg-surface/70 pl-[34px] pr-5 text-[16px] font-medium text-white outline-none backdrop-blur-[4px] transition focus:border-brand focus:bg-surface focus:shadow-[0_0_0_4px_rgba(57,211,83,.16),0_0_42px_rgba(57,211,83,.24)]"
+          />
+        </div>
         <button
           type="submit"
           disabled={loading}
-          className="font-display flex h-14 items-center gap-1 rounded-[13px] bg-brand px-6 text-[18px] font-extrabold tracking-[.08em] text-white shadow-[0_8px_24px_rgba(255,77,94,.34)] transition hover:bg-brand-hi disabled:cursor-wait disabled:opacity-75 cursor-pointer"
+          className="font-display group flex h-14 items-center gap-2 rounded-[14px] bg-gradient-to-b from-brand to-brand-mid px-7 text-[20px] tracking-[.06em] text-[#04130a] shadow-[0_0_0_1px_rgba(57,211,83,.4),0_10px_30px_rgba(57,211,83,.3)] transition hover:from-brand-hi hover:to-brand disabled:cursor-wait disabled:opacity-75"
         >
           {loading ? "SCOUTING…" : "SCOUT"}
           {!loading && (
-            <span className="text-[19px] leading-none">
-              <ArrowRight />
-            </span>
+            <ArrowRight
+              size={19}
+              strokeWidth={2.6}
+              className="transition-transform group-hover:translate-x-0.5"
+            />
           )}
         </button>
       </form>
@@ -64,36 +82,45 @@ export default function ScoutForm({
       {error && (
         <div
           role="alert"
-          className="mt-[13px] max-w-[440px] rounded-[10px] border border-brand/30 bg-brand/10 px-[13px] py-[10px] text-[13.5px] font-semibold text-[#ffb3bb]"
+          className="mt-[13px] max-w-[460px] rounded-[10px] border border-[#f85149]/30 bg-[#f85149]/10 px-[13px] py-[10px] text-[13.5px] font-medium text-[#ff9d96]"
         >
           {error}
         </div>
       )}
 
-      <div className="mt-[13px] text-[13px] text-ink-mute">
+      <div className="mt-[14px] text-[13px] text-ink-mute">
         try{" "}
-        <span onClick={() => onScout("torvalds")} className={exampleClass}>
+        <button
+          type="button"
+          onClick={() => onScout("torvalds")}
+          className={exampleClass}
+        >
           torvalds
-        </span>{" "}
+        </button>{" "}
         ·{" "}
-        <span onClick={() => onScout("sindresorhus")} className={exampleClass}>
+        <button
+          type="button"
+          onClick={() => onScout("sindresorhus")}
+          className={exampleClass}
+        >
           sindresorhus
-        </span>{" "}
+        </button>{" "}
         · or your own
       </div>
 
-      <div className="mt-[22px] flex flex-wrap items-center gap-x-[18px] gap-y-2 text-[12.5px] font-medium text-[#7a7488] max-[860px]:justify-center">
+      <div className="mt-[22px] flex flex-wrap items-center gap-x-[18px] gap-y-2 text-[12.5px] font-medium text-ink-mute max-[860px]:justify-center">
         <span className="inline-flex items-center gap-2">
-          <span className="h-[7px] w-[7px] rounded-full bg-[#2ec27e] shadow-[0_0_8px_#2ec27e]" />
+          <span className="h-[7px] w-[7px] rounded-full bg-brand shadow-[0_0_8px_var(--color-brand)]" />
           <strong className="font-bold text-ink-dim">12,480</strong> cards rated
           this window
         </span>
-        <span
+        <button
+          type="button"
           onClick={onOpenModal}
-          className="cursor-pointer font-bold text-ink-soft transition hover:text-ink-dim"
+          className="cursor-pointer font-semibold text-ink-soft transition hover:text-brand"
         >
           how it works ↗
-        </span>
+        </button>
       </div>
     </div>
   );

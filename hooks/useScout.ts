@@ -15,6 +15,16 @@ function readCache(login: string): Card | null {
   }
 }
 
+// Re-persist a card under its login (used when the flag is edited on the report,
+// so the chosen country survives a re-scout within the TTL).
+export function writeCardCache(card: Card): void {
+  try {
+    localStorage.setItem(cacheKey(card.login), JSON.stringify({ t: Date.now(), card }));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
 export function useScout() {
   const [card, setCard] = useState<Card | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,11 +48,7 @@ export function useScout() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Couldn't scout that profile.");
       setCard(data as Card);
-      try {
-        localStorage.setItem(cacheKey(login), JSON.stringify({ t: Date.now(), card: data }));
-      } catch {
-        /* quota / private mode */
-      }
+      writeCardCache(data as Card);
       return true;
     } catch (e) {
       setError((e as Error).message);
@@ -52,5 +58,16 @@ export function useScout() {
     }
   };
 
-  return { card, loading, error, scout };
+  // Edit the current card's flag in place (from the report-page picker) and
+  // persist it so a re-scout within the TTL keeps the choice. The cache write is
+  // kept out of the setState updater (updaters must stay pure) — `card` is the
+  // current value from the render this handler closed over.
+  const setCountry = (code: string) => {
+    if (!card) return;
+    const next = { ...card, country: code };
+    setCard(next);
+    writeCardCache(next);
+  };
+
+  return { card, loading, error, scout, setCountry };
 }

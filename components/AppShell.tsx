@@ -4,22 +4,29 @@ import { useState } from "react";
 import ScoutForm from "@/components/ScoutForm";
 import CardFan from "@/components/CardFan";
 import ResultView from "@/components/ResultView";
+import LoadingScreen from "@/components/LoadingScreen";
 import HowItWorksModal from "@/components/HowItWorksModal";
 import { useScout } from "@/hooks/useScout";
 import { SAMPLE_CARDS } from "@/lib/github/samples";
 import { Star } from "lucide-react";
 
 export default function AppShell() {
-  const { card, loading, error, scout } = useScout();
+  const { card, loading, error, scout, setCountry } = useScout();
   const [view, setView] = useState<"home" | "result">("home");
   const [modalOpen, setModalOpen] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
 
   const handleScout = async (name: string) => {
+    setPending(name.trim().replace(/^@/, ""));
     if (await scout(name)) {
       setView("result");
       window.scrollTo(0, 0);
     }
+    setPending(null);
   };
+
+  // Loading takes over the whole screen — the mascot is the entertainer here.
+  if (loading) return <LoadingScreen login={pending ?? undefined} />;
 
   return (
     <>
@@ -39,18 +46,25 @@ export default function AppShell() {
               href="https://github.com"
               target="_blank"
               rel="noopener"
-              className="inline-flex items-center gap-[9px] rounded-[10px] px-[15px] py-[9px] text-[13.5px] font-bold text-[#9a94a8] transition hover:bg-white/5 hover:text-ink"
+              className="inline-flex items-center gap-[9px] rounded-[10px] px-[15px] py-[9px] text-[13.5px] font-semibold text-ink-faint transition hover:bg-white/5 hover:text-ink"
             >
               Support the project
-              <div className="flex items-center gap-[5px]">
-                <span className="font-semibold text-ink-mute">2.4k</span>
-                <Star color="#fca68d" size={13} />
-              </div>
+              <span className="inline-flex items-center gap-[5px]">
+                <span className="font-mono font-semibold text-ink-mute">2.4k</span>
+                <Star color="var(--color-gold)" fill="var(--color-gold)" size={13} />
+              </span>
             </a>
           </footer>
         </main>
       ) : (
-        card && <ResultView card={card} onBack={() => setView("home")} />
+        card && (
+          <ResultView
+            key={card.login}
+            card={card}
+            onBack={() => setView("home")}
+            onCountryChange={setCountry}
+          />
+        )
       )}
 
       {modalOpen && <HowItWorksModal onClose={() => setModalOpen(false)} />}

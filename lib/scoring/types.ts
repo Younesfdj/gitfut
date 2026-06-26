@@ -16,7 +16,11 @@ export interface Signals {
   public_repos: number;
   total_stars_owned: number;
   max_repo_stars: number;
-  languages: number;
+  languages: number; // count of distinct primary languages
+  // Primary languages ranked by repo count (desc); rankedLanguages[0] is the
+  // most-used. Optional so hand-authored sample Signals stay valid.
+  rankedLanguages?: string[];
+  topLanguage?: string | null;
   recent_contributions: number;
   active_days_recent: number;
   active_years: number;
@@ -78,5 +82,11 @@ export interface Card {
   archetype: string;
   archetypeBlurb: string;
   legacy: { L: number };
+  // Most-used language (by repo count) and its resolved catalog logo. topLanguage
+  // is their true #1 even when it has no logo; languageLogo is the first ranked
+  // language that does (the fallback walk), or null if none are in the catalog.
+  // Both optional so previously serialized cards (localStorage) stay valid.
+  topLanguage?: string | null;
+  languageLogo?: { name: string; slug: string } | null;
   report: Report;
 }

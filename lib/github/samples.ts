@@ -8,9 +8,15 @@ import type { Card, Signals } from "@/lib/scoring/types";
 // names/stats are fake). The github.com/<login>.png redirect form fails the
 // <img crossOrigin> check, so always use the avatars.githubusercontent.com form.
 
-type SampleInput = Omit<Signals, "recent_spike">;
+type SampleInput = Omit<Signals, "recent_spike" | "topLanguage">;
 
-const make = (o: SampleInput): Signals => ({ ...o, recent_spike: false });
+// Defaults recent_spike and derives topLanguage from the sample's rankedLanguages
+// (so the home-fan cards show a language logo without restating the #1 twice).
+const make = (o: SampleInput): Signals => ({
+  ...o,
+  recent_spike: false,
+  topLanguage: o.rankedLanguages?.[0] ?? null,
+});
 
 const RAW: Signals[] = [
   make({
@@ -24,6 +30,7 @@ const RAW: Signals[] = [
     total_stars_owned: 248723,
     max_repo_stars: 237421,
     languages: 2,
+    rankedLanguages: ["C", "Assembly"],
     recent_contributions: 3187,
     active_days_recent: 356,
     active_years: 7,
@@ -45,6 +52,7 @@ const RAW: Signals[] = [
     total_stars_owned: 500,
     max_repo_stars: 500,
     languages: 5,
+    rankedLanguages: ["TypeScript", "Go", "Python", "Shell", "CSS"],
     recent_contributions: 700,
     active_days_recent: 160,
     active_years: 5,
@@ -66,6 +74,7 @@ const RAW: Signals[] = [
     total_stars_owned: 5000,
     max_repo_stars: 4200,
     languages: 5,
+    rankedLanguages: ["Rust", "TypeScript", "Go", "C++", "Lua"],
     recent_contributions: 1800,
     active_days_recent: 220,
     active_years: 2,
@@ -87,6 +96,7 @@ const RAW: Signals[] = [
     total_stars_owned: 250,
     max_repo_stars: 150,
     languages: 4,
+    rankedLanguages: ["Python", "JavaScript", "HTML", "CSS"],
     recent_contributions: 300,
     active_days_recent: 90,
     active_years: 1,

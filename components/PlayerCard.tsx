@@ -2,6 +2,7 @@
 
 import { memo, type CSSProperties } from "react";
 import type { Card, StatKey } from "@/lib/scoring/types";
+import { languageLogoUrl } from "@/lib/github/languages";
 import { CARD_THEME } from "./finishTheme";
 
 // Faithful port of the Python FUT generator's 540×820 layout. Positions are
@@ -209,23 +210,32 @@ function PlayerCard({ card }: { card: Card }) {
             width: "14.81%",
             height: "5.73%",
             objectFit: "contain",
-            borderRadius: "1cqw",
           }}
         />
       )}
 
-      {/* club badge */}
-      <img
-        src={`/badges/clubs/${card.club}.png`}
-        onError={hideOnError}
-        alt={card.club}
-        style={{
-          ...at(15.5, 40),
-          width: "19%",
-          height: "12%",
-          objectFit: "contain",
-        }}
-      />
+      {/* top language logo — a transparent PNG in the left identity column (under
+          the flag), taking the slot the club badge used to occupy. The catalog's
+          PNGs are full-colour on a transparent background, so they read on the
+          card art with no plate. crossOrigin keeps html-to-image export untainted;
+          onError hides it on a CDN miss. Cards without a logo leave the slot empty. */}
+      {card.languageLogo && (
+        <img
+          src={languageLogoUrl(card.languageLogo.slug)}
+          crossOrigin="anonymous"
+          onError={hideOnError}
+          alt={card.languageLogo.name}
+          title={card.languageLogo.name}
+          style={{
+            // Sized down from the old club-badge slot then nudged back up 25%,
+            // kept centred on the same point (so it stays under the flag).
+            ...at(19.06, 42.25),
+            width: "11.875%",
+            height: "7.5%",
+            objectFit: "contain",
+          }}
+        />
+      )}
 
       {/* name (centered across the card) */}
       <div

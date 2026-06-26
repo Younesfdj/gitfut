@@ -1,10 +1,13 @@
 import { cache } from "react";
+import { headers } from "next/headers";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Background from "@/components/Background";
 import { fetchProfile, type GithubError } from "@/lib/github/client";
 import { signalsFromPayload } from "@/lib/github/signals";
 import { buildCard } from "@/lib/scoring/engine";
+import { countryFromHeaders } from "@/lib/ipgeo";
+import { needsIpFallback, pickFlag } from "@/lib/flagPriority";
 import type { Card } from "@/lib/scoring/types";
 import ScoutRoute from "./ScoutRoute";
 
@@ -28,6 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
     return {
       title: `${res.card.name} — ${res.card.overall} ${res.card.finishLabel} · GitFut`,
       description: `${res.card.name} scouted on GitFut: ${res.card.overall} OVR ${res.card.position}, ${res.card.archetype}.`,
+      twitter: { card: "summary_large_image" },
     };
   }
   return { title: `@${username} · GitFut` };
@@ -47,21 +51,37 @@ function NotScouted({ username, error }: { username: string; error: GithubError 
       <p className="mt-3 text-[15.5px] leading-[1.5] text-ink-soft">{message}</p>
       <Link
         href="/"
-        className="font-display mt-7 inline-flex h-[46px] items-center rounded-xl bg-brand px-6 text-[15px] font-extrabold tracking-[.04em] text-white transition hover:bg-brand-hi"
+        className="font-display mt-7 inline-flex h-[46px] items-center rounded-xl bg-brand px-6 text-[16px] tracking-[.06em] text-[#04130a] transition hover:bg-brand-hi"
       >
-        Scout someone else
+        SCOUT SOMEONE ELSE
       </Link>
     </main>
   );
 }
 
-export default async function Page({ params }: { params: Promise<{ username: string }> }) {
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ username: string }>;
+  searchParams: Promise<{ country?: string }>;
+}) {
   const { username } = await params;
+  const { country: override } = await searchParams;
   const res = await loadCard(username);
+  // Flag priority, mirroring the API route: a shared-link override wins, then the
+  // GitHub-derived country, then the visitor's edge geo header. (No ipapi fallback
+  // here — a per-visit lookup on every shared card isn't worth it; the edge header
+  // covers production visitors.)
+  let card: Card | null = "card" in res ? res.card : null;
+  if (card) {
+    const ip = needsIpFallback(override, card.country) ? countryFromHeaders(await headers()) : null;
+    card = { ...card, country: pickFlag(override, card.country, ip) ?? "" };
+  }
   return (
     <div className="relative min-h-screen overflow-x-hidden text-ink">
       <Background />
-      {"card" in res ? <ScoutRoute card={res.card} /> : <NotScouted username={username} error={res.error} />}
+      {card ? <ScoutRoute card={card} /> : <NotScouted username={username} error={(res as { error: GithubError }).error} />}
     </div>
   );
 }

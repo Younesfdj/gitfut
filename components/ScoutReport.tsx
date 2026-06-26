@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Clock,
   FastForward,
@@ -15,7 +16,9 @@ import {
   Zap,
 } from "lucide-react";
 import type { Card, Finish, Metric, Playstyle } from "@/lib/scoring/types";
+import { languageLogoUrl } from "@/lib/github/languages";
 import { formatCount } from "@/lib/format";
+import { deEmDash } from "@/lib/text";
 import { RESULT_THEME } from "./finishTheme";
 
 const PLAYSTYLE_ICONS: Record<string, LucideIcon> = {
@@ -30,6 +33,11 @@ const PLAYSTYLE_ICONS: Record<string, LucideIcon> = {
   languages: Languages,
   "folder-git": FolderGit2,
   clock: Clock,
+};
+
+// Hide a logo/image that fails to load (e.g. a CDN miss) rather than show a broken icon.
+const hideOnError: React.ReactEventHandler<HTMLImageElement> = (e) => {
+  e.currentTarget.style.display = "none";
 };
 
 // The scout's one-line verdict — the signature, in recruitment vernacular.
@@ -139,75 +147,182 @@ function PlaystyleList({ playstyles, accent }: { playstyles: Playstyle[]; accent
   );
 }
 
-function MetricBar({ metric, accent }: { metric: Metric; accent: string }) {
-  const fill = Math.max(metric.score, 5); // never an empty bar — show a sliver minimum
+function MetricBar({ metric, accent, index = 0 }: { metric: Metric; accent: string; index?: number }) {
+  const fill = Math.max(metric.score, 4); // never an empty bar; show a sliver minimum
+  // Entrance: each row eases up + its bar sweeps from 0 to value, staggered down
+  // the list, so the panel "draws itself" like a live scouting readout.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    // Set is kept inside the timeout (never synchronous in the effect body) so it
+    // can't cascade renders. Reduced motion uses a 0ms delay — the global
+    // prefers-reduced-motion reset in globals.css makes the transition instant.
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const t = setTimeout(() => setMounted(true), reduced ? 0 : 120 + index * 55);
+    return () => clearTimeout(t);
+  }, [index]);
+
   return (
-    <div>
+    <div
+      style={{
+        opacity: mounted ? 1 : 0,
+        transform: mounted ? "translateY(0)" : "translateY(6px)",
+        transition: "opacity .5s ease, transform .5s cubic-bezier(.16,1,.3,1)",
+      }}
+    >
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[13.5px] text-ink-dim">{metric.label}</span>
-        <span className="font-display text-[15px] font-bold leading-none" style={{ color: accent }}>
-          {metric.score}
+        <span className="text-[13px] text-ink-dim">{metric.label}</span>
+        <span className="flex items-baseline gap-[6px]">
+          <span className="text-[11px] tabular-nums text-ink-mute">
+            {formatCount(metric.value)}
+            {metric.unit ? ` ${metric.unit}` : ""}
+          </span>
+          <span className="font-display text-[16px] font-bold leading-none tabular-nums" style={{ color: accent }}>
+            {metric.score}
+          </span>
         </span>
       </div>
-      <div className="mt-[6px] h-[3px] overflow-hidden rounded-full bg-white/[0.08]">
-        <div className="h-full rounded-full" style={{ width: `${fill}%`, background: accent }} />
-      </div>
-      <div className="mt-[3px] text-right text-[11px] tabular-nums text-ink-mute">
-        {formatCount(metric.value)}
-        {metric.unit ? ` ${metric.unit}` : ""}
+      <div className="mt-[7px] h-[3px] overflow-hidden rounded-full bg-white/[0.07]">
+        <div
+          className="h-full rounded-full transition-[width] duration-[900ms] ease-out"
+          style={{ width: mounted ? `${fill}%` : "0%", background: `linear-gradient(90deg, ${accent}99, ${accent})` }}
+        />
       </div>
     </div>
   );
 }
 
-// Dossier-style header: ruled eyebrow, name, meta + @login link, verdict tag.
+// A child that fades + lifts into place on mount, staggered by `step`. Honors
+// reduced motion (appears instantly). Powers the header's cascade entrance.
+function Stagger({ step, children, className }: { step: number; children: React.ReactNode; className?: string }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const t = setTimeout(() => setShown(true), reduced ? 0 : 90 + step * 110);
+    return () => clearTimeout(t);
+  }, [step]);
+  return (
+    <div
+      className={className}
+      style={{
+        opacity: shown ? 1 : 0,
+        transform: shown ? "translateY(0) scale(1)" : "translateY(10px) scale(.98)",
+        transition: "opacity .55s ease, transform .55s cubic-bezier(.16,1,.3,1)",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Scouting-dossier header. A left "grade stamp" (the OVR + tier, the scout's
+// verdict-at-a-glance) anchors the row; the identity block sits beside it with
+// the name as hero, one clean meta line, and the verdict inline. No centered
+// stack, no floating pill, no decorative flanking rules.
 export function ReportHeader({ card }: { card: Card }) {
   const theme = RESULT_THEME[card.finish];
   const accent = theme.ink;
   return (
-    <header className="text-center">
-      <div className="flex items-center justify-center gap-[14px]">
-        <span className="h-px w-[clamp(24px,8vw,52px)] bg-white/15" />
-        <span className="font-display text-[12px] font-bold tracking-[.34em] text-brand">SCOUT REPORT</span>
-        <span className="h-px w-[clamp(24px,8vw,52px)] bg-white/15" />
-      </div>
-
-      <h2 className="font-display mt-[7px] text-[clamp(27px,4.2vw,46px)] font-black leading-[.95]">{card.name}</h2>
-
-      <div className="mt-[9px] flex flex-wrap items-center justify-center gap-x-[10px] gap-y-[6px] text-[14px]">
-        <span
-          className="font-display rounded-md px-[10px] py-[4px] text-[13px] font-bold tracking-[.12em]"
-          style={{ background: theme.chip, color: accent }}
+    <header className="relative mx-auto flex max-w-[640px] items-center gap-[clamp(16px,3vw,28px)]">
+      {/* left — the grade stamp: OVR over tier, the dossier's headline metric */}
+      <Stagger step={0} className="shrink-0">
+        <div
+          className="relative flex h-[clamp(78px,13vw,98px)] w-[clamp(78px,13vw,98px)] flex-col items-center justify-center rounded-2xl border"
+          style={{
+            borderColor: `${accent}40`,
+            background: `linear-gradient(160deg, ${accent}1a, transparent 70%), #161b22`,
+            boxShadow: `0 0 30px ${accent}1f, inset 0 1px 0 ${accent}26`,
+          }}
         >
-          {card.position}
-        </span>
-        <span className="text-ink-soft">{card.archetype}</span>
-        <span className="text-ink-faint">
-          {card.finishLabel} · {card.overall} OVR
-        </span>
-        <a
-          href={`https://github.com/${card.login}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-ink-faint underline-offset-2 transition hover:text-ink-soft hover:underline"
-        >
-          @{card.login}
-        </a>
-      </div>
+          <span
+            className="font-display text-[clamp(34px,6vw,46px)] font-black leading-[.82] tabular-nums"
+            style={{ color: accent, filter: `drop-shadow(0 1px 8px ${accent}55)` }}
+          >
+            {card.overall}
+          </span>
+          <span className="font-display mt-[2px] text-[10px] font-bold tracking-[.22em] text-ink-faint">
+            {card.finishLabel}
+          </span>
+        </div>
+      </Stagger>
 
-      <div
-        className="mt-[11px] inline-flex items-center gap-[9px] rounded-full border px-[14px] py-[5px]"
-        style={{ borderColor: `${accent}44` }}
-      >
-        <span className="font-display text-[10.5px] font-bold tracking-[.2em] text-ink-faint">VERDICT</span>
-        <span className="text-[13px] font-semibold" style={{ color: accent }}>
-          {VERDICTS[card.finish]}
-        </span>
-      </div>
+      {/* right — identity block, left-aligned */}
+      <div className="min-w-0 flex-1 text-left">
+        <Stagger step={1}>
+          <div className="flex items-center gap-[8px]">
+            <span className="font-display text-[11px] font-bold tracking-[.3em] text-brand">SCOUT REPORT</span>
+            <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" />
+          </div>
+        </Stagger>
 
-      <p className="mx-auto mt-[11px] line-clamp-2 max-w-[540px] text-[14.5px] leading-[1.45] text-ink-soft">
-        {card.archetypeBlurb}.
-      </p>
+        <Stagger step={2} className="relative">
+          <div
+            aria-hidden
+            className="animate-glow pointer-events-none absolute -left-[6%] top-1/2 -z-10 h-[160%] w-[70%] -translate-y-1/2 rounded-full blur-[42px]"
+            style={{ background: `radial-gradient(closest-side, ${theme.glow}, transparent 72%)` }}
+          />
+          <h2
+            className="font-display mt-[2px] truncate text-[clamp(32px,5.4vw,56px)] font-black leading-[.92]"
+            style={{
+              backgroundImage: `linear-gradient(100deg, #e6edf3 0%, #e6edf3 38%, ${accent} 50%, #fff 54%, #e6edf3 64%, #e6edf3 100%)`,
+              backgroundSize: "220% 100%",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+              filter: `drop-shadow(0 2px 14px ${accent}38)`,
+              animation: "gf-name-shimmer 4.5s ease-in-out 0.6s both",
+            }}
+          >
+            {card.name}
+          </h2>
+        </Stagger>
+
+        <Stagger step={3}>
+          <div className="mt-[8px] flex flex-wrap items-center gap-x-[10px] gap-y-[6px]">
+            <span
+              className="font-display inline-flex items-center rounded-[6px] border border-brand/40 bg-brand/15 px-[9px] py-[3px] text-[12.5px] font-bold leading-none tracking-[.14em] text-brand"
+            >
+              {card.position}
+            </span>
+            <span className="text-[14px] font-medium text-ink-dim">{card.archetype}</span>
+            <span aria-hidden className="h-[11px] w-px bg-white/15" />
+            <a
+              href={`https://github.com/${card.login}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-[13px] text-ink-faint underline-offset-2 transition hover:text-brand hover:underline"
+            >
+              @{card.login}
+            </a>
+            {card.topLanguage && (
+              <>
+                <span aria-hidden className="h-[11px] w-px bg-white/15" />
+                <span className="inline-flex items-center gap-[6px] text-[13px] text-ink-dim">
+                  {card.languageLogo && (
+                    <img
+                      src={languageLogoUrl(card.languageLogo.slug)}
+                      onError={hideOnError}
+                      alt=""
+                      aria-hidden
+                      className="h-[15px] w-[15px] object-contain"
+                    />
+                  )}
+                  {card.topLanguage}
+                </span>
+              </>
+            )}
+          </div>
+        </Stagger>
+
+        {/* verdict inline: label + grade, then the blurb continues the sentence */}
+        <Stagger step={4}>
+          <p className="mt-[9px] line-clamp-2 text-[13.5px] leading-[1.5] text-ink-soft">
+            <span className="font-display mr-[7px] text-[11px] font-bold tracking-[.18em]" style={{ color: accent }}>
+              {VERDICTS[card.finish].toUpperCase()}
+            </span>
+            {deEmDash(card.archetypeBlurb)}.
+          </p>
+        </Stagger>
+      </div>
     </header>
   );
 }
@@ -256,8 +371,8 @@ export function MetricsPanel({ card }: { card: Card }) {
   return (
     <Section title="SCOUTING METRICS" accent={accent} className="w-full">
       <div className="flex flex-col gap-[13px] pt-1">
-        {card.report.metrics.map((m) => (
-          <MetricBar key={m.label} metric={m} accent={accent} />
+        {card.report.metrics.map((m, i) => (
+          <MetricBar key={m.label} metric={m} accent={accent} index={i} />
         ))}
       </div>
     </Section>

@@ -1,4 +1,5 @@
 import type { RawPayload } from "./client";
+import { rankLanguages } from "./languages";
 import type { Signals } from "@/lib/scoring/types";
 
 const YEAR_MS = 31557600000;
@@ -13,6 +14,8 @@ export function signalsFromPayload(p: RawPayload, now = Date.now()): Signals {
   const max_repo_stars = p.repos.reduce((m, r) => Math.max(m, r.stars), 0);
   const langs = new Set(p.repos.map((r) => r.language).filter(Boolean) as string[]);
   const languages = langs.size;
+  // Primary languages ranked by repo count — the #1 drives the card's language logo.
+  const rankedLanguages = rankLanguages(p.repos);
 
   const years = new Set<number>();
   for (const r of p.repos) {
@@ -41,6 +44,8 @@ export function signalsFromPayload(p: RawPayload, now = Date.now()): Signals {
     total_stars_owned,
     max_repo_stars,
     languages,
+    rankedLanguages,
+    topLanguage: rankedLanguages[0] ?? null,
     recent_contributions,
     active_days_recent: p.recentActiveDays,
     active_years,
