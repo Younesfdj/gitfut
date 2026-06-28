@@ -3,7 +3,6 @@ import Redis from "ioredis";
 
 // One shared connection, stashed on globalThis so dev HMR doesn't leak sockets.
 declare global {
-  // eslint-disable-next-line no-var
   var __gitfutRedis: Redis | null | undefined;
 }
 

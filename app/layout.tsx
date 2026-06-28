@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Bebas_Neue, Inter, JetBrains_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/next";
 
 // Display — ultra-condensed all-caps for the WC26 "tournament" impact.
 const display = Bebas_Neue({
@@ -57,7 +57,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${display.variable} ${sans.variable} ${mono.variable} ${dinCond.variable} ${dinBold.variable} ${dinMedium.variable} antialiased`}
     >
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
