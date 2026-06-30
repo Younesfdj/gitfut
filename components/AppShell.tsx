@@ -7,6 +7,7 @@ import CardFan from "@/components/CardFan";
 import LoadingScreen from "@/components/LoadingScreen";
 import HowItWorksModal from "@/components/HowItWorksModal";
 import FooterCredit from "@/components/FooterCredit";
+import GithubStar from "@/components/GithubStar";
 import { SAMPLE_CARDS } from "@/lib/github/samples";
 
 export default function AppShell({ stars, scoutCount }: { stars: number | null; scoutCount: number | null }) {
@@ -39,7 +40,10 @@ export default function AppShell({ stars, scoutCount }: { stars: number | null; 
   return (
     <>
       <main className="relative z-[2] flex min-h-screen flex-col">
-        <div className="mx-auto flex w-full max-w-[1180px] flex-1 items-center gap-[clamp(24px,5vw,72px)] px-[clamp(22px,5vw,56px)] max-[860px]:flex-col max-[860px]:gap-[34px] max-[860px]:pb-6 max-[860px]:pt-[clamp(26px,5vh,40px)] max-[860px]:text-center">
+        <header className="relative z-[3] flex w-full flex-none items-center justify-end px-[clamp(22px,5vw,56px)] pt-[clamp(16px,3vh,26px)]">
+          <GithubStar stars={stars} />
+        </header>
+        <div className="mx-auto flex w-full max-w-[1180px] flex-1 items-center gap-[clamp(24px,5vw,72px)] px-[clamp(22px,5vw,56px)] max-[860px]:flex-col max-[860px]:gap-[34px] max-[860px]:pb-6 max-[860px]:pt-[clamp(14px,3vh,26px)] max-[860px]:text-center">
           <ScoutForm
             loading={isPending}
             error={null}
@@ -50,7 +54,7 @@ export default function AppShell({ stars, scoutCount }: { stars: number | null; 
           <CardFan cards={SAMPLE_CARDS} onPick={handleScout} />
         </div>
         <footer className="relative z-[2] mt-auto flex flex-none items-center justify-center p-[clamp(12px,2.6vh,24px)]">
-          <FooterCredit stars={stars} />
+          <FooterCredit />
         </footer>
       </main>
 

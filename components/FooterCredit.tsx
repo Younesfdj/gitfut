@@ -1,11 +1,7 @@
-import { Heart, Star } from "lucide-react";
-import { formatCount } from "@/lib/format";
-
-// lucide dropped its brand marks, so the X (Twitter) logo is an inline SVG —
-// same pattern as the GitHub octocat that used to live in SupportLink.
+// lucide dropped its brand marks, so the X (Twitter) logo is an inline SVG.
 // `relative top-px` nudges the glyph onto the text's optical center (the SVG's
 // own bounding box sits a hair high against the font's x-height).
-function XMark({ size = 14 }: { size?: number }) {
+function XMark({ size = 13 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -20,20 +16,17 @@ function XMark({ size = 14 }: { size?: number }) {
   );
 }
 
-const AUTHORS: ReadonlyArray<{ name: string; x: string }> = [
-  { name: "younesfdj", x: "https://x.com/younesfdj" },
-  { name: "Mawsis", x: "https://x.com/wassim_khouas" },
+const AUTHORS: ReadonlyArray<{ handle: string; x: string }> = [
+  { handle: "Younes", x: "https://x.com/younesfdj" },
+  { handle: "Mawsis", x: "https://x.com/wassim_khouas" },
 ];
 
-const REPO_URL = "https://github.com/younesfdj/gitfut";
-
-// Footer author credit — "made with ♥ by younesfdj ✕ & Mawsis ✕  ★ 1.2k".
-// Replaces the old "Support the project" link; the star/repo link folds the
-// star CTA back in, reusing the same server-fetched `stars` prop. Shared by the
-// home footer (AppShell) and the scout-report footer (ResultView) so they match.
-// A soft dark backdrop lifts the credit off the contribution-grid motif so the
-// text keeps its contrast wherever the footer lands.
-export default function FooterCredit({ stars }: { stars: number | null }) {
+// Footer author credit — "Built by  @younesfdj ✕  &  @wassim_khouas ✕". The repo
+// star CTA moved out to the top-right GithubStar pill, so this is now purely the
+// maker credit. Shared by the home footer (AppShell) and the scout-report footer
+// (ResultView) so they match. A soft dark backdrop lifts the credit off the
+// contribution-grid motif so the text keeps its contrast wherever it lands.
+export default function FooterCredit() {
   return (
     <div className="relative inline-flex max-w-full items-center justify-center">
       {/* weak dark fade behind the credit — soft-edged, no hard pill outline */}
@@ -42,18 +35,8 @@ export default function FooterCredit({ stars }: { stars: number | null }) {
         className="pointer-events-none absolute inset-x-[-18px] inset-y-[-6px] rounded-full bg-bg-deep/70 blur-[10px]"
       />
 
-      <div className="relative flex flex-wrap items-center justify-center gap-x-[7px] gap-y-[4px] text-[13.5px] font-semibold leading-none text-ink-soft">
-        <span className="inline-flex items-center gap-[5px]">
-          made with
-          <Heart
-            color="var(--color-brand)"
-            fill="var(--color-brand)"
-            size={13}
-            aria-label="love"
-            className="relative top-px shrink-0"
-          />
-          by
-        </span>
+      <div className="relative flex flex-wrap items-center justify-center gap-x-[6px] gap-y-[4px] text-[13.5px] font-semibold leading-none text-ink-soft">
+        <span className="text-ink-mute">Built by</span>
 
         {AUTHORS.map((author, i) => (
           <span key={author.x} className="inline-flex items-center gap-[6px]">
@@ -63,22 +46,13 @@ export default function FooterCredit({ stars }: { stars: number | null }) {
               rel="noopener"
               className="inline-flex items-center gap-[5px] rounded-[7px] px-[6px] py-[3px] text-ink-dim transition hover:bg-white/8 hover:text-ink"
             >
-              {author.name}
-              <XMark size={14} />
+              <XMark size={13} />@{author.handle}
             </a>
-            {i < AUTHORS.length - 1 && <span className="text-ink-mute">&amp;</span>}
+            {i < AUTHORS.length - 1 && (
+              <span className="text-ink-mute">&amp;</span>
+            )}
           </span>
         ))}
-
-        <a
-          href={REPO_URL}
-          target="_blank"
-          rel="noopener"
-          className="ml-[2px] inline-flex items-center gap-[5px] rounded-[7px] px-[7px] py-[3px] text-ink-dim transition hover:bg-white/8 hover:text-ink"
-        >
-          <Star color="var(--color-gold)" fill="var(--color-gold)" size={13} className="relative top-px shrink-0" />
-          {stars !== null && stars >= 10 && <span className="font-mono font-semibold">{formatCount(stars)}</span>}
-        </a>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import CardImageSync from "./CardImageSync";
 import FlagPicker from "./FlagPicker";
 import Mascot from "./Mascot";
 import FooterCredit from "./FooterCredit";
+import GithubStar from "./GithubStar";
 import HowItWorksModal from "./HowItWorksModal";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
 import { resolveResultTheme } from "./finishTheme";
@@ -125,13 +126,16 @@ export default function ResultView({
           </button>
           <Mascot size={40} kick={false} ball={false} animate={false} />
         </div>
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          className="cursor-pointer text-[12.5px] font-semibold text-ink-soft underline-offset-2 transition hover:text-brand hover:underline"
-        >
-          how it works ↗
-        </button>
+        <div className="flex items-center gap-[clamp(10px,2vw,16px)]">
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="cursor-pointer text-[12.5px] font-semibold text-ink-soft underline-offset-2 transition hover:text-brand hover:underline max-[420px]:hidden"
+          >
+            how it works ↗
+          </button>
+          <GithubStar stars={stars ?? null} />
+        </div>
       </div>
 
       <div className="shrink-0">
@@ -197,7 +201,7 @@ export default function ResultView({
       </div>
 
       <footer className="relative z-[2] mt-auto flex flex-none items-center justify-center p-[clamp(12px,2.6vh,24px)]">
-        <FooterCredit stars={stars ?? null} />
+        <FooterCredit />
       </footer>
 
       {generateShare && shareSig && (
