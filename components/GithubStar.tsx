@@ -32,7 +32,7 @@ export default function GithubStar({ stars }: { stars: number | null }) {
       target="_blank"
       rel="noopener"
       aria-label="Star GitFut on GitHub"
-      className="group inline-flex items-center gap-[8px] rounded-full border border-line bg-bg-deep/55 py-[7px] pl-[13px] pr-[7px] text-[13px] font-semibold text-ink-soft backdrop-blur-md transition duration-200 hover:-translate-y-px hover:border-ink-mute hover:bg-bg-deep/80 hover:text-ink"
+      className="group inline-flex items-center gap-[8px] rounded-full border border-line bg-bg-deep/55 py-[7px] pl-[13px] pr-[7px] text-[13px] font-semibold text-ink-soft backdrop-blur-md transition duration-200 hover:-translate-y-px hover:border-ink-mute hover:bg-bg-deep/80 hover:text-ink absolute right-10 top-5"
     >
       <GithubMark size={16} />
       <span className="max-[520px]:hidden">Star on GitHub</span>
