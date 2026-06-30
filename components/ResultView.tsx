@@ -126,7 +126,7 @@ export default function ResultView({
           </button>
           <Mascot size={40} kick={false} ball={false} animate={false} />
         </div>
-        <div className="flex items-center gap-[clamp(10px,2vw,16px)]">
+        <div className="flex items-center gap-[clamp(10px,2vw,16px)] justify-end">
           <button
             type="button"
             onClick={() => setModalOpen(true)}

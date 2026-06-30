@@ -40,10 +40,12 @@ export default function AppShell({ stars, scoutCount }: { stars: number | null; 
   return (
     <>
       <main className="relative z-[2] flex min-h-screen flex-col">
-        <header className="relative z-[3] flex w-full flex-none items-center justify-end px-[clamp(22px,5vw,56px)] pt-[clamp(16px,3vh,26px)]">
+        {/* Overlaid in the corner (not a flow header) so it never pushes the
+            vertically-centered hero down. */}
+        <div className="absolute right-[clamp(20px,5vw,52px)] top-[clamp(16px,3vh,26px)] z-[3]">
           <GithubStar stars={stars} />
-        </header>
-        <div className="mx-auto flex w-full max-w-[1180px] flex-1 items-center gap-[clamp(24px,5vw,72px)] px-[clamp(22px,5vw,56px)] max-[860px]:flex-col max-[860px]:gap-[34px] max-[860px]:pb-6 max-[860px]:pt-[clamp(14px,3vh,26px)] max-[860px]:text-center">
+        </div>
+        <div className="mx-auto flex w-full max-w-[1180px] flex-1 items-center gap-[clamp(24px,5vw,72px)] px-[clamp(22px,5vw,56px)] max-[860px]:flex-col max-[860px]:gap-[34px] max-[860px]:pb-6 max-[860px]:pt-[clamp(40px,6vh,56px)] max-[860px]:text-center">
           <ScoutForm
             loading={isPending}
             error={null}
