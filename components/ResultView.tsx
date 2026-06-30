@@ -9,7 +9,7 @@ import CardActions from "./CardActions";
 import CardImageSync from "./CardImageSync";
 import FlagPicker from "./FlagPicker";
 import Mascot from "./Mascot";
-import SupportLink from "./SupportLink";
+import FooterCredit from "./FooterCredit";
 import HowItWorksModal from "./HowItWorksModal";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
 import { resolveResultTheme } from "./finishTheme";
@@ -25,7 +25,7 @@ interface Props {
   shareSig?: string;
   /** When true (image missing/stale), render + upload the share image to Blob. */
   generateShare?: boolean;
-  /** Repo stars for the "Support the project" footer link (null = plain link). */
+  /** Repo stars for the footer credit's star/repo link (null = no count shown). */
   stars?: number | null;
   /** GitHub-derived flag; share links only carry ?country= when it's overridden. */
   canonicalCountry?: string;
@@ -197,7 +197,7 @@ export default function ResultView({
       </div>
 
       <footer className="relative z-[2] mt-auto flex flex-none items-center justify-center p-[clamp(12px,2.6vh,24px)]">
-        <SupportLink stars={stars ?? null} />
+        <FooterCredit stars={stars ?? null} />
       </footer>
 
       {generateShare && shareSig && (

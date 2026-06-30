@@ -6,7 +6,7 @@ import ScoutForm from "@/components/ScoutForm";
 import CardFan from "@/components/CardFan";
 import LoadingScreen from "@/components/LoadingScreen";
 import HowItWorksModal from "@/components/HowItWorksModal";
-import SupportLink from "@/components/SupportLink";
+import FooterCredit from "@/components/FooterCredit";
 import { SAMPLE_CARDS } from "@/lib/github/samples";
 
 export default function AppShell({ stars, scoutCount }: { stars: number | null; scoutCount: number | null }) {
@@ -50,7 +50,7 @@ export default function AppShell({ stars, scoutCount }: { stars: number | null; 
           <CardFan cards={SAMPLE_CARDS} onPick={handleScout} />
         </div>
         <footer className="relative z-[2] mt-auto flex flex-none items-center justify-center p-[clamp(12px,2.6vh,24px)]">
-          <SupportLink stars={stars} />
+          <FooterCredit stars={stars} />
         </footer>
       </main>
 
