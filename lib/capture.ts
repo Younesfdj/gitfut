@@ -58,6 +58,14 @@ export async function renderCardImage<T>(
     );
     await nextFrame();
     await nextFrame();
+    // WebKit/Safari drops every raster layer (card art, avatar, flag, logo) from
+    // the FIRST html-to-image render unless a painted, blurred element is in the
+    // tree — the tier glow halo was incidentally that element. The transparent
+    // cut-out removes the glow (above), which re-exposes the bug: the export
+    // comes back as just the text overlay. A throwaway priming render fixes it
+    // (the documented html-to-image Safari workaround) — only paid on the
+    // transparent path (copy), since every other export keeps the glow.
+    if (opts.transparent) await capture(clone).catch(() => {});
     return await capture(clone);
   } finally {
     holder.remove();
