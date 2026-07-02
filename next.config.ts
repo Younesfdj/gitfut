@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
     // files still win over it regardless.
     return [
       { source: "/:username([a-zA-Z0-9-]+).png", destination: "/api/card-image/:username" },
+      // SVG embed: gitfut.com/<username>.svg → SVG wrapper around the PNG card.
+      // Useful for GitHub profile READMEs and other contexts that prefer SVG.
+      { source: "/:username([a-zA-Z0-9-]+).svg", destination: "/api/card-svg/:username" },
     ];
   },
 };
