@@ -47,6 +47,11 @@ export interface RawPayload {
 }
 
 const ENDPOINT = "https://api.github.com/graphql";
+const REST_ENDPOINT = "https://api.github.com";
+const REST_HEADERS = {
+  Accept: "application/vnd.github+json",
+  "User-Agent": "gitfut",
+};
 const VALID = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
 const GITHUB_EPOCH_YEAR = 2008; // GitHub launched Feb 2008; no account predates it.
 const LIFETIME_BATCH = 4; // contribution windows per request — stays well under GitHub's timeout.
@@ -92,6 +97,24 @@ interface YearContrib {
   restrictedContributionsCount: number;
 }
 
+interface RestUser {
+  login: string;
+  name: string | null;
+  avatar_url: string;
+  location: string | null;
+  created_at: string;
+  followers: number;
+  public_repos: number;
+}
+
+interface RestRepoItem {
+  stargazers_count: number;
+  language: string | null;
+  created_at: string;
+  pushed_at: string | null;
+  fork: boolean;
+}
+
 // POSTs a query, retrying transient failures. Terminal failures (bad token,
 // not found, rate limit) throw a GithubError; success returns the user node.
 async function gql<T>(query: string, login: string, token: string, retries = 1): Promise<{ user: T | null }> {
@@ -135,6 +158,10 @@ async function gql<T>(query: string, login: string, token: string, retries = 1):
 
     if (body.errors?.some((e) => e.type === "RATE_LIMITED")) {
       return fail("ratelimit", "GitHub rate limit hit. Try again shortly.");
+    }
+    if (body.errors?.length) {
+      const message = body.errors.map((e) => e.message).filter(Boolean).join(" ");
+      return fail("network", message || "GitHub GraphQL returned an error.");
     }
     return { user: body.data?.user ?? null };
   }
@@ -236,13 +263,67 @@ export async function fetchProfile(username: string, now = new Date()): Promise<
   const token = process.env.GITHUB_TOKEN;
   if (!token) return fail("config", "Server is missing a GitHub token.");
 
-  const { user } = await gql<UserNode>(profileQuery(), login, token);
-  if (!user) return fail("notfound", "No GitHub user by that name.");
+  let user: UserNode | null = null;
+  let graphQlError: GithubError | null = null;
+  try {
+    ({ user } = await gql<UserNode>(profileQuery(), login, token));
+  } catch (e) {
+    graphQlError = e as GithubError;
+  }
+
+  if (!user) {
+    if (graphQlError?.type === "ratelimit" || graphQlError?.type === "config") {
+      throw graphQlError;
+    }
+    return fetchPublicProfile(login);
+  }
 
   const createdYear = new Date(user.createdAt).getUTCFullYear();
   const lifetimeContributions = await fetchLifetime(login, token, createdYear, now.getUTCFullYear(), now.toISOString());
 
   return normalize(user, lifetimeContributions);
+}
+
+async function restJson<T>(path: string, fallbackType: GithubErrorType = "network"): Promise<T> {
+  const res = await fetch(`${REST_ENDPOINT}${path}`, { headers: REST_HEADERS });
+  if (res.status === 404) return fail("notfound", "No GitHub user by that name.");
+  if (res.status === 403 || res.status === 429) return fail("ratelimit", "GitHub rate limit hit. Try again shortly.");
+  if (!res.ok) return fail(fallbackType, `GitHub returned an error (${res.status}).`);
+  return (await res.json()) as T;
+}
+
+async function fetchPublicProfile(login: string): Promise<RawPayload> {
+  const user = await restJson<RestUser>(`/users/${encodeURIComponent(login)}`);
+  const publicRepos = await restJson<RestRepoItem[]>(
+    `/users/${encodeURIComponent(user.login)}/repos?type=owner&sort=pushed&per_page=100`,
+  );
+  const repos = publicRepos
+    .filter((r) => !r.fork)
+    .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0))
+    .map((r) => ({
+      stars: r.stargazers_count ?? 0,
+      language: r.language ?? null,
+      createdAt: r.created_at,
+      pushedAt: r.pushed_at ?? r.created_at,
+    }));
+
+  return {
+    login: user.login,
+    name: user.name,
+    avatarUrl: user.avatar_url,
+    location: user.location,
+    createdAt: user.created_at,
+    followers: user.followers,
+    publicRepos: user.public_repos,
+    repos,
+    recentCommits: 0,
+    recentPRs: 0,
+    recentReviews: 0,
+    recentIssues: 0,
+    recentRestricted: 0,
+    recentActiveDays: 0,
+    lifetimeContributions: 0,
+  };
 }
 
 function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
