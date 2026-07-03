@@ -57,6 +57,12 @@ const fail = (type: GithubErrorType, message: string): never => {
 
 const delay = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 
+// GitHub's actual "no such user" error. Anything else in `errors` (a timed-out
+// sub-resolver like contributionsCollection, abuse detection, a transient
+// hiccup) still nulls the whole `user` node because the failing field is
+// non-nullable — but it does NOT mean the login is invalid.
+const NOT_FOUND_MESSAGE = /could not resolve to a user/i;
+
 // --- GraphQL response shapes (only the fields we read) ---
 interface UserNode {
   login: string;
@@ -133,8 +139,22 @@ async function gql<T>(query: string, login: string, token: string, retries = 1):
       return fail("network", "GitHub returned a malformed response.");
     }
 
-    if (body.errors?.some((e) => e.type === "RATE_LIMITED")) {
-      return fail("ratelimit", "GitHub rate limit hit. Try again shortly.");
+    if (body.errors?.length) {
+      if (body.errors.some((e) => e.type === "RATE_LIMITED")) {
+        return fail("ratelimit", "GitHub rate limit hit. Try again shortly.");
+      }
+      const isNotFound = body.errors.some(
+        (e) => e.type === "NOT_FOUND" || NOT_FOUND_MESSAGE.test(e.message ?? ""),
+      );
+      if (!isNotFound) {
+        // A real user got nulled by some other resolver error — retry once,
+        // then report it as a transient failure instead of "notfound".
+        if (attempt < retries) {
+          await delay();
+          continue;
+        }
+        return fail("network", "GitHub had a hiccup fetching that profile. Try again.");
+      }
     }
     return { user: body.data?.user ?? null };
   }
