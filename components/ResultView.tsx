@@ -10,6 +10,7 @@ import CardImageSync from "./CardImageSync";
 import FlagPicker from "./FlagPicker";
 import Mascot from "./Mascot";
 import FooterCredit from "./FooterCredit";
+import BuyMeACoffee from "./BuyMeACoffee";
 import HowItWorksModal from "./HowItWorksModal";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
 import { resolveResultTheme } from "./finishTheme";
@@ -224,6 +225,8 @@ export default function ResultView({
         <StoryFrame ref={storyRef} card={card} />
       </div>
     </main>
+
+    <BuyMeACoffee />
 
     {modalOpen && <HowItWorksModal onClose={() => setModalOpen(false)} />}
     </>
