@@ -26,6 +26,10 @@ export async function renderCardImage<T>(
   clone.style.width = `${node.offsetWidth}px`;
   clone.style.margin = "0";
 
+  // Firefox workaround (Issue #7): explicit font-family to prevent html-to-image
+  // from crashing in Firefox when getComputedStyle().fontFamily resolves undefined
+  clone.style.fontFamily = node.style.fontFamily || window.getComputedStyle(node).fontFamily || "sans-serif";
+
   // Transparent cut-out: strip everything that paints OUTSIDE the card silhouette
   // — the tier glow halo and the card frame's own drop-shadow/glow filter — so the
   // copy is just the card on full transparency (the card art's corners are already
