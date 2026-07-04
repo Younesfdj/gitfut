@@ -51,7 +51,12 @@ export interface RawPayload {
 }
 
 const ENDPOINT = "https://api.github.com/graphql";
-const VALID = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
+// GitHub's username *charset*: alphanumerics + hyphens, 1–39 chars, at least one
+// alphanumeric. Deliberately looser than GitHub's modern signup grammar (which
+// forbids leading/trailing/double hyphens) so we still accept legacy accounts that
+// predate it — e.g. "Gandalf-", a real 2014 account. GitHub is the arbiter of
+// existence; this only screens out impossible input (spaces, symbols, over-length).
+const VALID = /^(?=.*[a-z\d])[a-z\d-]{1,39}$/i;
 const GITHUB_EPOCH_YEAR = 2008; // GitHub launched Feb 2008; no account predates it.
 const LIFETIME_BATCH = 4; // contribution windows per request — stays well under GitHub's timeout.
 // Abort a GitHub request that hangs at the socket level, instead of letting it

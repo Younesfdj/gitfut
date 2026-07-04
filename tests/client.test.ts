@@ -169,6 +169,29 @@ describe("fetchProfile token pool", () => {
   });
 });
 
+describe("fetchProfile username validation", () => {
+  it("accepts legacy usernames with a trailing hyphen (real GitHub accounts)", async () => {
+    scriptFetch((_t, body) => okFor(body));
+    // "Gandalf-" is a real 2014 account; it must reach GitHub, not be rejected as invalid.
+    await expect(fetchProfile("gandalf-", NOW)).resolves.toBeTruthy();
+    expect(calls.length).toBeGreaterThan(0);
+  });
+
+  it("also accepts leading and double hyphens (other legacy edge cases)", async () => {
+    scriptFetch((_t, body) => okFor(body));
+    await expect(fetchProfile("-gandalf", NOW)).resolves.toBeTruthy();
+    await expect(fetchProfile("gan--dalf", NOW)).resolves.toBeTruthy();
+  });
+
+  it("still rejects impossible input before any network call", async () => {
+    const mock = scriptFetch((_t, body) => okFor(body));
+    for (const bad of ["foo bar", "foo@bar", "", "-", "a".repeat(40)]) {
+      await expect(fetchProfile(bad, NOW)).rejects.toMatchObject({ type: "invalid" });
+    }
+    expect(mock).not.toHaveBeenCalled();
+  });
+});
+
 describe("fetchProfile request timeout", () => {
   it("aborts a hung request at 8s (under Vercel's ~10s cap) and fails as a network error", async () => {
     vi.useFakeTimers();
