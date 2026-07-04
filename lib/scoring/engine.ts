@@ -29,12 +29,19 @@ function rawStats(s: Signals): Stats {
     sho: 36 + 13 * Lg(s.total_stars_owned) + 5 * Lg(s.max_repo_stars),
     pas: 40 + 12 * Lg(s.prs_to_others) + 9 * Lg(s.followers),
     // DRI = genuine range, square-root scaled so breadth has diminishing returns:
-    // ~65 at one language, ~80 at ten, ~85 at fifteen. The old linear count
-    // saturated (8 languages already ~94, maxed at 9), letting a noisy signal own
-    // the card and crown every polyglot a Fantasista.
-    dri: 58 + 7 * Math.sqrt(s.languages),
-    def: 40 + 14 * Lg(s.reviews + s.issues_closed),
-    phy: 40 + 9 * Lg(s.total_contributions_lifetime) + 2.2 * Math.min(s.active_years, 12),
+    // ~51 at one language, ~75 at ten, ~83 at fifteen. Floor matches the other
+    // five stats (was 58, structurally out-scoring everything else and crowning
+    // almost every profile a CAM regardless of their actual signal shape).
+    dri: 40 + 11 * Math.sqrt(s.languages),
+    def: 40 + 15 * Lg(s.reviews + s.issues_closed),
+    // Lifetime volume accrues for any account with history, not just skilled
+    // ones, so both terms are kept modest (was 9x + 2.2x) — at that weight PHY
+    // saturated to 99 for anyone with a few years of steady activity and made
+    // Anchor/CDM the default family for almost everyone. At 5x + 0.5x, family
+    // spreads across Playmaker/Forward/Anchor for varied Signals (checked by
+    // hand via buildCard); extreme-tenure profiles can still spike PHY high
+    // enough to win Anchor, which is the intended outlier case, not the norm.
+    phy: 40 + 5 * Lg(s.total_contributions_lifetime) + 0.5 * Math.min(s.active_years, 12),
   };
   for (const k of STATS) o[k] = clamp(Math.round(o[k]), 1, 99);
   return o;
