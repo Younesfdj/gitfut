@@ -20,6 +20,7 @@ import type { Card, Finish, Metric, Playstyle } from "@/lib/scoring/types";
 import { languageLogoUrl } from "@/lib/github/languages";
 import { formatCount } from "@/lib/format";
 import { deEmDash } from "@/lib/text";
+import { buildRadarPoints, getRadarStats } from "@/lib/scoring/radar";
 import { resolveResultTheme, rgba } from "./finishTheme";
 
 const PLAYSTYLE_ICONS: Record<string, LucideIcon> = {
@@ -103,17 +104,19 @@ function Section({
   className,
   children,
 }: {
-  title: string;
+  title?: string;
   accent: string;
   className?: string;
   children: React.ReactNode;
 }) {
   return (
     <section className={`rounded-2xl border border-white/[0.06] bg-white/[0.02] p-[16px] ${className ?? ""}`}>
-      <div className="mb-[8px] flex items-center gap-[9px]">
-        <span className="h-[2px] w-[16px] rounded-full" style={{ background: accent }} />
-        <h3 className="font-display text-[11px] font-bold tracking-[.22em] text-ink-faint">{title}</h3>
-      </div>
+      {title ? (
+        <div className="mb-[8px] flex items-center gap-[9px]">
+          <span className="h-[2px] w-[16px] rounded-full" style={{ background: accent }} />
+          <h3 className="font-display text-[11px] font-bold tracking-[.22em] text-ink-faint">{title}</h3>
+        </div>
+      ) : null}
       {children}
     </section>
   );
@@ -382,15 +385,94 @@ export function AttributesPanel({ card }: { card: Card }) {
   );
 }
 
+function RadarChart({ card }: { card: Card }) {
+  const accent = resolveResultTheme(card).ink;
+  const points = buildRadarPoints(card.stats);
+  const radarStats = getRadarStats(card.stats);
+  const polygon = points.map((p) => `${p.x},${p.y}`).join(" ");
+  const chartSize = 140;
+  const center = chartSize / 2;
+  const maxRadius = 70;
+  const grid = [0.25, 0.5, 0.75].map((level) => {
+    const radius = maxRadius * level;
+    const ringPoints = Array.from({ length: 6 }, (_, index) => {
+      const angle = (-Math.PI / 2 + (Math.PI * 2 * index) / 6) % (Math.PI * 2);
+      return `${center + Math.cos(angle) * radius},${center + Math.sin(angle) * radius}`;
+    }).join(" ");
+    return { level, ringPoints };
+  });
+  const axisLabels = radarStats.map((stat, index) => {
+    const angle = (-Math.PI / 2 + (Math.PI * 2 * index) / 6) % (Math.PI * 2);
+    const labelRadius = maxRadius + 10;
+    const x = center + Math.cos(angle) * labelRadius;
+    const y = center + Math.sin(angle) * labelRadius;
+    const dx = Math.abs(Math.cos(angle)) < 0.2 ? 0 : Math.sign(Math.cos(angle)) * 3;
+    const dy = Math.abs(Math.sin(angle)) < 0.2 ? 0 : Math.sign(Math.sin(angle)) * 3;
+    const labelWidth = 8 + stat.label.length * 5.2;
+    return {
+      ...stat,
+      x: Math.max(8, Math.min(chartSize - labelWidth - 8, x + dx - labelWidth / 2)),
+      y: Math.max(12, Math.min(chartSize - 12, y + dy)),
+      width: labelWidth,
+    };
+  });
+
+  return (
+   
+      <svg viewBox="0 0 140 140" className="mx-auto block h-[240px] w-full max-w-[280px] shrink-0">
+        <rect x="0" y="0" width="140" height="140" rx="18" fill="rgba(255,255,255,0.01)" />
+        {grid.map((ring) => (
+          <polygon key={ring.level} points={ring.ringPoints} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.8" />
+        ))}
+        {points.map((point, index) => {
+          const angle = (-Math.PI / 2 + (Math.PI * 2 * index) / 6) % (Math.PI * 2);
+          const x = center + Math.cos(angle) * (maxRadius - 4);
+          const y = center + Math.sin(angle) * (maxRadius - 4);
+          return <line key={`${point.x}-${point.y}`} x1={center} y1={center} x2={x} y2={y} stroke="rgba(255,255,255,0.15)" strokeWidth="0.8" />;
+        })}
+        <polygon points={polygon} fill={`${accent}33`} stroke={accent} strokeWidth="1.8" />
+        {points.map((point, index) => (
+          <circle key={`${index}-${point.x}`} cx={point.x} cy={point.y} r="2.5" fill={accent} />
+        ))}
+        {axisLabels.map((label) => (
+          <text
+            key={label.key}
+            x={label.x + label.width / 2}
+            y={label.y}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="8.5"
+            fontWeight="700"
+            letterSpacing="0.08em"
+            fill="rgba(230, 237, 243, 0.95)"
+          >
+            {label.label}
+          </text>
+        ))}
+      </svg>
+   
+  );
+}
+
 // Right side: scouting metrics.
 export function MetricsPanel({ card }: { card: Card }) {
   const accent = resolveResultTheme(card).ink;
   return (
-    <Section title="SCOUTING METRICS" accent={accent} className="w-full">
-      <div className="flex flex-col gap-[13px] pt-1">
-        {card.report.metrics.map((m, i) => (
-          <MetricBar key={m.label} metric={m} accent={accent} index={i} />
-        ))}
+    <Section accent={accent} className="w-full">
+      
+      <div className="mb-[10px] flex items-center gap-[9px]">
+        <span className="h-[2px] w-[16px] rounded-full" style={{ background: accent }} />
+      <h3 className="font-display text-[11px] font-bold tracking-[.22em] text-ink-faint">SCOUTING METRICS
+</h3>
+      </div>
+       
+       <div className="flex flex-col gap-[12px]">
+        <RadarChart card={card} />
+        <div className="flex flex-col gap-[13px] pt-1">
+          {card.report.metrics.map((m, i) => (
+            <MetricBar key={m.label} metric={m} accent={accent} index={i} />
+          ))}
+        </div>
       </div>
     </Section>
   );
