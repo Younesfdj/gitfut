@@ -17,8 +17,8 @@ interface PlaystyleDef {
 const CATALOG: PlaystyleDef[] = [
   { name: "Star Magnet", icon: "star", noun: "stars earned", value: (s) => s.total_stars_owned, base: 500, plus: 20_000 },
   { name: "Viral Hit", icon: "flame", noun: "stars on one repo", value: (s) => s.max_repo_stars, base: 1_000, plus: 20_000 },
-  { name: "Workhorse", icon: "zap", noun: "active days this year", value: (s) => s.active_days_recent, base: 120, plus: 250 },
-  { name: "Rapid Fire", icon: "fast-forward", noun: "contributions this year", value: (s) => s.recent_contributions, base: 500, plus: 2_500 },
+  { name: "Workhorse", icon: "zap", noun: "active days in the past year", value: (s) => s.active_days_recent, base: 120, plus: 250 },
+  { name: "Rapid Fire", icon: "fast-forward", noun: "contributions in the past year", value: (s) => s.recent_contributions, base: 500, plus: 2_500 },
   { name: "Marathoner", icon: "infinity", noun: "lifetime contributions", value: (s) => s.total_contributions_lifetime, base: 3_000, plus: 25_000 },
   { name: "Maintainer", icon: "shield", noun: "reviews & issues", value: (s) => s.reviews + s.issues_closed, base: 30, plus: 300 },
   { name: "Connector", icon: "git-pull-request", noun: "pull requests", value: (s) => s.prs_to_others, base: 30, plus: 400 },
