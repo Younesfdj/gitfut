@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useId, useMemo, useReducer, useRef, useState, useLayoutEffect } from "react";
 import { Pencil, Plus, Search, X } from "lucide-react";
 import { searchCountries } from "@/lib/countries";
 import { comboboxReducer, initialComboboxState } from "@/lib/comboboxNav";
@@ -37,6 +37,7 @@ export default function FlagPicker({ value, onChange }: Props) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const [openAbove, setOpenAbove] = useState(false);
   const baseId = useId();
   const listId = `${baseId}-list`;
   const optionId = (i: number) => `${baseId}-opt-${i}`;
@@ -59,6 +60,21 @@ export default function FlagPicker({ value, onChange }: Props) {
     // optionId is stable (derived from useId()), so it's safe to omit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, open]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const spaceBelow = viewportHeight - rect.bottom - 12;
+    const spaceAbove = rect.top - 12;
+    const need = 300; // approximate popover height (search + max list + borders)
+
+    setOpenAbove(spaceBelow < need && spaceAbove >= need);
+  }, [open, query]);
 
   const choose = (code: string) => {
     onChange(code);
@@ -141,7 +157,12 @@ export default function FlagPicker({ value, onChange }: Props) {
           role="presentation"
           className="animate-pop pointer-events-auto absolute z-30 w-[280px] max-w-[80vw] overflow-hidden rounded-[14px] border border-line bg-panel/95 shadow-[0_18px_46px_-12px_rgba(0,0,0,.7)] backdrop-blur-[10px]"
           // anchor below the flag slot
-          style={{ left: SLOT.left, top: `calc(${SLOT.top} + ${SLOT.height} + 2.5%)` }}
+          style={{
+            left: SLOT.left,
+            top: openAbove ? SLOT.top : `calc(${SLOT.top} + ${SLOT.height} + 2.5%)`,
+            transform: openAbove ? "translateY(-100%)" : undefined,
+            transformOrigin: openAbove ? "left bottom" : "left top",
+          }}
         >
           <div className="relative border-b border-line/70 p-[10px]">
             <Search
