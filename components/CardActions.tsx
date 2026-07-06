@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toBlob, toPng } from "html-to-image";
-import { Check, Copy, Download, ImageDown, Link2, Share2 } from "lucide-react";
+import { Check, ChevronDown, Copy, Download, ImageDown, Link2, Share2 } from "lucide-react";
 import type { Card } from "@/lib/scoring/types";
 import { cardUrl, intentUrl, nativeSharePayload } from "@/lib/share";
 import { renderCardImage } from "@/lib/capture";
@@ -16,73 +16,36 @@ import { resolveResultTheme } from "./finishTheme";
 const RENDER_OPTS = { pixelRatio: 3, cacheBust: true } as const;
 const STORY_RENDER_OPTS = { pixelRatio: 1, cacheBust: true } as const;
 
-interface ExportAction {
-  id: string;
-  label: string;
-  title: string;
-  done: string;
-  icon: typeof Download;
-  run: (node: HTMLElement, card: Card) => Promise<void>;
-}
+// Feedback and progress copy per action — shown on the split button itself
+// (the menu closes as soon as an item is picked, so the button carries the
+// "Saving… → Saved" story for everything in it).
+type ActionId = "download" | "copy" | "story" | "link";
 
-// Image actions only — link/social sharing lives in the visible share row.
-const EXPORTS: ExportAction[] = [
-  {
-    id: "download",
-    label: "Download",
-    title: "Download as PNG",
-    done: "Saved",
-    icon: Download,
-    run: async (node, card) => {
-      // renderCardImage awaits fonts and captures an off-screen clone that
-      // carries the gitfut.com signature (hidden on the live card).
-      const url = await renderCardImage(node, (n) => toPng(n, RENDER_OPTS));
-      const a = document.createElement("a");
-      a.download = `${card.login}-gitfut.png`;
-      a.href = url;
-      a.click();
-    },
-  },
-  {
-    id: "copy",
-    label: "Copy image",
-    title: "Copy image to clipboard",
-    done: "Copied",
-    icon: Copy,
-    run: async (node) => {
-      // Pass a Promise<Blob> so clipboard.write() fires synchronously within the
-      // click's user activation; awaiting the (slow, 3x) render first lets the
-      // activation lapse → NotAllowedError. The browser awaits the blob itself.
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "image/png": renderCardImage(
-            node,
-            async (n) => {
-              const blob = await toBlob(n, RENDER_OPTS);
-              if (!blob) throw new Error("render returned no image");
-              return blob;
-            },
-            { transparent: true },
-          ),
-        }),
-      ]);
-    },
-  },
-];
+const ACTION_COPY: Record<ActionId, { name: string; busy: string; done: string }> = {
+  download: { name: "Download", busy: "Saving…", done: "Saved" },
+  copy: { name: "Copy image", busy: "Copying…", done: "Copied" },
+  story: { name: "Story", busy: "Rendering…", done: "Done" },
+  link: { name: "Copy link", busy: "…", done: "Link copied" },
+};
 
-const PLATFORM_BTN =
-  "group flex items-center justify-center gap-[7px] rounded-xl border border-line bg-white/[0.03] py-[11px] text-[12.5px] font-semibold text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:bg-[var(--pb)]/[0.12] hover:text-white active:translate-y-0 active:scale-[.98]";
+const ICON_BTN =
+  "group flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-line bg-white/[0.03] text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:text-white active:translate-y-0 active:scale-[.96]";
+
+const MENU_ITEM =
+  "flex w-full items-center gap-[9px] rounded-lg px-[11px] py-[9px] text-left text-[12.5px] font-semibold text-ink-soft transition-colors hover:bg-white/[0.06] hover:text-white";
 
 // Brand-colored border + glow on hover, so each target reads as tappable and
-// recognizable rather than three identical grey tabs.
+// recognizable rather than identical grey squares.
 const brandHover = (brand: string) => ({
   onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.style.borderColor = `${brand}66`;
     e.currentTarget.style.boxShadow = `0 6px 18px -8px ${brand}80`;
+    e.currentTarget.style.background = `${brand}1a`;
   },
   onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.style.borderColor = "";
     e.currentTarget.style.boxShadow = "";
+    e.currentTarget.style.background = "";
   },
 });
 
@@ -95,18 +58,37 @@ export default function CardActions({
   card: Card;
   targetRef: React.RefObject<HTMLDivElement | null>;
   /** Off-screen 1080×1920 story canvas, captured for the Instagram-Story export. */
-  storyRef?: React.RefObject<HTMLDivElement | null>;
+  storyRef: React.RefObject<HTMLDivElement | null>;
   /** GitHub-derived flag; the share link only carries ?country= when overridden. */
   canonicalCountry?: string;
 }) {
-  const [done, setDone] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [done, setDone] = useState<ActionId | null>(null);
+  const [busy, setBusy] = useState<ActionId | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const caretRef = useRef<HTMLButtonElement>(null);
+  // Whether the current open came from the keyboard (click detail === 0), so
+  // only keyboard users get focus moved into the menu — mouse users keep it
+  // where they clicked.
+  const openedByKey = useRef(false);
 
   // Download CTA picks up the card's own tier color so the action matches the
   // card the user is saving (bronze → bronze, silver → silver, TOTY → blue,
   // founder → their accent).
   const tier = resolveResultTheme(card).ink;
+
+  // Both halves of the split button wear the same tier tint and hover swap —
+  // inline (not a CSS class) because the tier color is data-driven.
+  const splitHalf = {
+    style: { color: tier, borderColor: `${tier}66`, background: `${tier}1f` },
+    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.currentTarget.style.background = `${tier}33`;
+    },
+    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.currentTarget.style.background = `${tier}1f`;
+    },
+  };
 
   // The share/copy link carries ?country= ONLY when the flag is a manual override
   // (differs from the GitHub-derived default). Otherwise we strip it so the URL
@@ -114,11 +96,11 @@ export default function CardActions({
   const shareCard =
     card.country && card.country !== canonicalCountry ? card : { ...card, country: "" };
 
-  // Share-row gestures (native sheet + copy link) — shared with DuelView. The
+  // Share gestures (native sheet + copy link) — shared with DuelView. The
   // native payload attaches the freshly rendered card image when the platform
   // can share files; otherwise it falls back to the text+url payload, and a
   // failed/unsupported share opens the X intent.
-  const { canNativeShare, nativeShare, copyLink, linkCopied } = useShareActions({
+  const { canNativeShare, nativeShare, copyLink } = useShareActions({
     getSharePayload: async () => {
       const node = targetRef.current;
       const payload = nativeSharePayload(shareCard);
@@ -137,33 +119,111 @@ export default function CardActions({
     getCopyUrl: () => cardUrl(shareCard),
   });
 
-  const runExport = async (a: ExportAction) => {
-    const node = targetRef.current;
-    if (!node || busy) return;
-    setBusy(a.id);
+  // Escape closes the export menu (returning focus to the caret that opened
+  // it); a pointerdown outside menuRef is the click-away. Not onBlur with
+  // relatedTarget: WebKit and macOS Firefox fire blur with a null relatedTarget
+  // before a menu item's click, which would unmount the menu and swallow the
+  // click — and Safari buttons never take focus on mouse click, so focus loss
+  // alone can't detect clicking elsewhere either.
+  useEffect(() => {
+    if (!menuOpen) return;
+    if (openedByKey.current) {
+      menuRef.current?.querySelector<HTMLButtonElement>("[role='menuitem']")?.focus();
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        caretRef.current?.focus();
+      }
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [menuOpen]);
+
+  // Minimal ARIA-menu keyboard support: ArrowDown/ArrowUp rove focus through
+  // the items, wrapping at the ends (entry focus + Escape live in the effect).
+  const onMenuKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>("[role='menuitem']") ?? [],
+    );
+    if (!items.length) return;
+    const i = items.indexOf(document.activeElement as HTMLButtonElement);
+    items[e.key === "ArrowDown" ? (i + 1) % items.length : i <= 0 ? items.length - 1 : i - 1]?.focus();
+  };
+
+  const finish = (id: ActionId) => {
+    setDone(id);
+    setTimeout(() => setDone((d) => (d === id ? null : d)), 1500);
+  };
+
+  const track = async (id: ActionId, run: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(id);
     setError(null);
+    setMenuOpen(false);
     try {
-      await a.run(node, card); // each action awaits fonts.ready itself, so the
-      // clipboard copy can call write() synchronously within the user gesture.
-      setDone(a.id);
-      setTimeout(() => setDone((d) => (d === a.id ? null : d)), 1500);
+      await run();
+      finish(id);
     } catch (e) {
-      console.error("[gitfut] card export failed:", e);
-      setError(`${a.label} failed: ${e instanceof Error ? e.message : String(e)}`);
+      console.error(`[gitfut] card ${id} failed:`, e);
+      setError(`${ACTION_COPY[id].name} failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(null);
     }
   };
 
+  const downloadPng = () =>
+    track("download", async () => {
+      const node = targetRef.current;
+      if (!node) return;
+      // renderCardImage awaits fonts and captures an off-screen clone that
+      // carries the gitfut.com signature (hidden on the live card).
+      const url = await renderCardImage(node, (n) => toPng(n, RENDER_OPTS));
+      const a = document.createElement("a");
+      a.download = `${card.login}-gitfut.png`;
+      a.href = url;
+      a.click();
+    });
+
+  const copyImage = () =>
+    track("copy", async () => {
+      const node = targetRef.current;
+      if (!node) return;
+      // Pass a Promise<Blob> so clipboard.write() fires synchronously within the
+      // click's user activation (a menu-item click is one); awaiting the slow 3x
+      // render first lets the activation lapse → NotAllowedError. The browser
+      // awaits the blob itself.
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": renderCardImage(
+            node,
+            async (n) => {
+              const blob = await toBlob(n, RENDER_OPTS);
+              if (!blob) throw new Error("render returned no image");
+              return blob;
+            },
+            { transparent: true },
+          ),
+        }),
+      ]);
+    });
+
   // Instagram-Story export (1080×1920). On mobile, prefer the native share sheet
   // with the image attached — that's the one-tap route into IG Stories. On
-  // desktop (no file share), fall back to downloading the PNG to upload manually.
-  const shareStory = async () => {
-    const node = storyRef?.current;
-    if (!node || busy) return;
-    setBusy("story");
-    setError(null);
-    try {
+  // desktop (no reliable file share), fall back to downloading the PNG.
+  const shareStory = () =>
+    track("story", async () => {
+      const node = storyRef.current;
+      if (!node) return;
       const blob = await renderCardImage(node, async (n) => {
         const b = await toBlob(n, STORY_RENDER_OPTS);
         if (!b) throw new Error("render returned no image");
@@ -171,11 +231,10 @@ export default function CardActions({
       });
       const file = new File([blob], `${card.login}-gitfut-story.png`, { type: "image/png" });
 
-      // On mobile, the share sheet is the one-tap route into IG Stories. On
-      // desktop, navigator.share with a file is often advertised (canShare=true)
-      // but no-ops or is dismissed — so it must NEVER be the only outcome.
-      // Only mobile (coarse pointer) attempts share; everyone else downloads,
-      // and a dismissed/failed share also falls back to download.
+      // navigator.share with a file is often advertised on desktop (canShare
+      // = true) but no-ops — so it must never be the only outcome. Only mobile
+      // (coarse pointer) attempts share; everyone else downloads, and a failed
+      // share also falls back to download.
       const isMobile =
         typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
       let shared = false;
@@ -191,10 +250,8 @@ export default function CardActions({
           if (e instanceof Error && e.name === "AbortError") {
             shared = true; // user saw the sheet and chose to dismiss — don't also download
           }
-          // any other failure: fall through to download
         }
       }
-
       if (!shared) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -203,21 +260,30 @@ export default function CardActions({
         a.click();
         URL.revokeObjectURL(url);
       }
+    });
 
-      setDone("story");
-      setTimeout(() => setDone((d) => (d === "story" ? null : d)), 1500);
-    } catch (e) {
-      console.error("[gitfut] story export failed:", e);
-      setError(`Story failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setBusy(null);
-    }
-  };
+  const copyCardLink = () =>
+    track("link", async () => {
+      // copyLink reports failure as `false` (DuelView wants that shape) — turn
+      // it into a throw here so track shows its error state instead of a false
+      // "Link copied".
+      if (!(await copyLink())) throw new Error("clipboard unavailable");
+    });
+
+  // The split button's main zone tells the whole story: idle label, per-action
+  // progress, then the action's done copy.
+  const mainLabel = busy
+    ? ACTION_COPY[busy].busy
+    : done
+      ? ACTION_COPY[done].done
+      : "Download";
 
   return (
     <div className="flex w-full flex-col gap-[10px]">
-      {/* primary — native share sheet (shown only where it's supported, so it
-          never degrades into a duplicate X-share). Focal green CTA. */}
+      {/* primary — only where the platform has a native share sheet
+          (canNativeShare stays false through SSR/first paint and is revealed
+          post-hydration); on desktop the CTA never renders, so it can't
+          degrade into a duplicate of the X icon below. */}
       {canNativeShare && (
         <button
           type="button"
@@ -233,137 +299,105 @@ export default function CardActions({
         </button>
       )}
 
-      {/* visible share targets — one tap each, always shown */}
-      <div className="grid w-full grid-cols-3 gap-[8px]">
+      {/* the action row: two icon-square share targets + the Download split
+          button (main zone downloads instantly; the caret opens the export
+          menu — Copy image, Story format, Copy link). */}
+      <div className="flex w-full gap-[8px]">
         <button
           type="button"
           onClick={() => window.open(intentUrl("x", shareCard), "_blank", "noopener,noreferrer")}
           title="Share on X"
           aria-label="Share on X"
-          className={PLATFORM_BTN}
-          style={{ "--pb": "#ffffff" } as React.CSSProperties}
+          className={ICON_BTN}
           {...brandHover("#ffffff")}
         >
-          <XLogo size={15} />
-          <span className="max-[360px]:hidden">X</span>
+          <XLogo size={16} />
         </button>
         <button
           type="button"
           onClick={() => window.open(intentUrl("linkedin", shareCard), "_blank", "noopener,noreferrer")}
           title="Share on LinkedIn"
           aria-label="Share on LinkedIn"
-          className={PLATFORM_BTN}
-          style={{ "--pb": "#3b9eff" } as React.CSSProperties}
+          className={ICON_BTN}
           {...brandHover("#3b9eff")}
         >
-          <LinkedInLogo size={15} />
-          <span className="max-[360px]:hidden">LinkedIn</span>
+          <LinkedInLogo size={16} />
         </button>
-        <button
-          type="button"
-          onClick={copyLink}
-          title="Copy link to this card"
-          aria-label="Copy link to this card"
-          className={PLATFORM_BTN}
-          style={{ "--pb": "#39d353" } as React.CSSProperties}
-          {...brandHover("#39d353")}
-        >
-          {linkCopied ? <Check size={15} className="text-brand" /> : <Link2 size={15} />}
-          <span className="max-[360px]:hidden">{linkCopied ? "Copied" : "Copy link"}</span>
-        </button>
-      </div>
 
-      {/* image actions — Download is the highest-intent action (save to repost),
-          so it's the hero of this row; Copy image sits beside it. */}
-      {(() => {
-        const dl = EXPORTS.find((a) => a.id === "download")!;
-        const rest = EXPORTS.filter((a) => a.id !== "download");
-        const dlDone = done === dl.id;
-        const dlBusy = busy === dl.id;
-        const DlIcon = dl.icon;
-        return (
-          <div className="grid w-full grid-cols-[1.6fr_1fr] gap-[8px]">
-            <button
-              onClick={() => runExport(dl)}
-              disabled={dlBusy}
-              title="Download your card as an image"
-              aria-label="Download your card as an image"
-              className="group relative flex items-center justify-center gap-[8px] overflow-hidden rounded-xl border py-[12px] text-[13.5px] font-bold tracking-[.02em] transition-all duration-200 ease-out hover:-translate-y-[1px] active:translate-y-0 active:scale-[.98] disabled:opacity-70"
-              style={{ color: tier, borderColor: `${tier}66`, background: `${tier}1f` }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = `${tier}b3`;
-                e.currentTarget.style.background = `${tier}33`;
-                e.currentTarget.style.boxShadow = `0 10px 26px -8px ${tier}8c`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = `${tier}66`;
-                e.currentTarget.style.background = `${tier}1f`;
-                e.currentTarget.style.boxShadow = "";
-              }}
+        <div ref={menuRef} className="relative flex min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={downloadPng}
+            disabled={!!busy}
+            title="Download your card as an image"
+            aria-label="Download your card as an image"
+            className="group flex h-[46px] min-w-0 flex-1 items-center justify-center gap-[8px] rounded-l-xl border border-r-0 text-[13.5px] font-bold tracking-[.02em] transition-all duration-200 ease-out disabled:opacity-70"
+            {...splitHalf}
+          >
+            {busy ? (
+              <span
+                className="h-[15px] w-[15px] shrink-0 animate-spin rounded-full border-[1.5px]"
+                style={{ borderColor: `${tier}40`, borderTopColor: tier }}
+              />
+            ) : done ? (
+              <Check size={16} strokeWidth={2.6} className="shrink-0" />
+            ) : (
+              <Download
+                size={16}
+                strokeWidth={2.4}
+                className="shrink-0 transition-transform group-hover:translate-y-[1px]"
+              />
+            )}
+            <span className="truncate">{mainLabel}</span>
+          </button>
+          <button
+            ref={caretRef}
+            type="button"
+            onClick={(e) => {
+              openedByKey.current = e.detail === 0; // Enter/Space clicks carry detail 0
+              setMenuOpen((o) => !o);
+            }}
+            disabled={!!busy}
+            title="More export options"
+            aria-label="More export options"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            className="flex h-[46px] w-[34px] shrink-0 items-center justify-center rounded-r-xl border transition-all duration-200 ease-out disabled:opacity-70"
+            {...splitHalf}
+          >
+            <ChevronDown
+              size={15}
+              strokeWidth={2.4}
+              className={`transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {menuOpen && (
+            <div
+              role="menu"
+              aria-label="Export options"
+              onKeyDown={onMenuKeyDown}
+              className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[180px] overflow-hidden rounded-xl border border-line bg-surface p-[4px] shadow-[0_14px_36px_-10px_rgba(0,0,0,.8)]"
+              style={{ animation: "pop .16s cubic-bezier(.16,1,.3,1) both" }}
             >
-              {dlBusy ? (
-                <span
-                  className="h-[15px] w-[15px] animate-spin rounded-full border-[1.5px]"
-                  style={{ borderColor: `${tier}40`, borderTopColor: tier }}
-                />
-              ) : dlDone ? (
-                <Check size={16} strokeWidth={2.6} />
-              ) : (
-                <DlIcon size={16} strokeWidth={2.4} className="transition-transform group-hover:translate-y-[1px]" />
-              )}
-              {dlBusy ? "Saving…" : dlDone ? "Saved" : "Download"}
-            </button>
-
-            {rest.map((a) => {
-              const isDone = done === a.id;
-              const isBusy = busy === a.id;
-              const Icon = a.icon;
-              return (
-                <button
-                  key={a.id}
-                  onClick={() => runExport(a)}
-                  disabled={isBusy}
-                  title={a.title}
-                  aria-label={a.title}
-                  className="group inline-flex items-center justify-center gap-[6px] rounded-xl border border-line bg-white/[0.03] py-[12px] text-[12.5px] font-semibold text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-white/25 hover:bg-white/[0.07] hover:text-white active:translate-y-0 active:scale-[.98] disabled:opacity-60"
-                >
-                  {isBusy ? (
-                    <span className="h-[13px] w-[13px] animate-spin rounded-full border-[1.5px] border-white/25 border-t-white/80" />
-                  ) : isDone ? (
-                    <Check size={14} className="text-brand" />
-                  ) : (
-                    <Icon size={14} className="transition-colors group-hover:text-white" />
-                  )}
-                  {isBusy ? "…" : isDone ? a.done : a.label}
-                </button>
-              );
-            })}
-          </div>
-        );
-      })()}
-
-      {/* Instagram-Story export — a 1080×1920 vertical image, the format Stories
-          want. One button: shares-with-file on mobile (one tap into IG), or
-          downloads the PNG on desktop. */}
-      {storyRef && (
-        <button
-          type="button"
-          onClick={shareStory}
-          disabled={busy === "story"}
-          title="Download a 1080×1920 image sized for Instagram Stories"
-          aria-label="Download a story-format image for Instagram Stories"
-          className="group inline-flex w-full items-center justify-center gap-[8px] rounded-xl border border-line bg-white/[0.03] py-[12px] text-[12.5px] font-semibold text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-[#e1306c]/55 hover:bg-[#e1306c]/[0.1] hover:text-white hover:shadow-[0_8px_22px_-10px_rgba(225,48,108,.8)] active:translate-y-0 active:scale-[.98] disabled:opacity-60"
-        >
-          {busy === "story" ? (
-            <span className="h-[14px] w-[14px] animate-spin rounded-full border-[1.5px] border-white/25 border-t-white/80" />
-          ) : done === "story" ? (
-            <Check size={15} className="text-brand" />
-          ) : (
-            <ImageDown size={15} className="transition-colors group-hover:text-[#ff5a8a]" />
+              {/* literal items (no render-built handler array): the compiler
+                  only trusts ref-reading closures in onClick position */}
+              <button type="button" role="menuitem" onClick={copyImage} className={MENU_ITEM}>
+                <Copy size={14} className="shrink-0" />
+                Copy image
+              </button>
+              <button type="button" role="menuitem" onClick={shareStory} className={MENU_ITEM}>
+                <ImageDown size={14} className="shrink-0" />
+                Story format
+              </button>
+              <button type="button" role="menuitem" onClick={copyCardLink} className={MENU_ITEM}>
+                <Link2 size={14} className="shrink-0" />
+                Copy link
+              </button>
+            </div>
           )}
-          {busy === "story" ? "Rendering…" : done === "story" ? "Done" : "Story format"}
-        </button>
-      )}
+        </div>
+      </div>
 
       {error && <p className="text-center text-[12px] leading-snug text-[#ff9d96]">{error}</p>}
     </div>
