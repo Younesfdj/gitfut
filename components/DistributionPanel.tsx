@@ -65,13 +65,13 @@ export default function DistributionPanel({ card }: { card: Card }) {
         <text
           x={meX}
           y={PAD_TOP - 6}
-          textAnchor={card.overall > 88 ? "end" : "middle"}
+          textAnchor={card.overall > 88 ? "end" : card.overall < 62 ? "start" : "middle"}
           fill={accent}
           fontSize={9.5}
           fontWeight={700}
           letterSpacing={1}
         >
-          YOU · {card.overall}
+          {card.login.toLowerCase()} · {card.overall}
         </text>
         {/* axis labels */}
         {[50, 60, 70, 80, 90, 100].map((x) => (
