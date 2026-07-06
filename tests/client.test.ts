@@ -221,3 +221,82 @@ describe("fetchProfile request timeout", () => {
     expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
   });
 });
+
+describe("fetchProfile language diversity (owned ∪ contributed)", () => {
+  // A profile whose OWNED public repos are thin (one TS repo + one empty repo),
+  // but who commits to several repos they don't own — the org/team-dev shape that
+  // used to score "0 languages".
+  const ownedNode = (nameWithOwner: string, language: string | null) => ({
+    nameWithOwner,
+    stargazerCount: 0,
+    primaryLanguage: language ? { name: language } : null,
+    createdAt: "2022-01-01T00:00:00Z",
+    pushedAt: "2024-01-01T00:00:00Z",
+  });
+  const contrib = (
+    nameWithOwner: string,
+    totalCount: number,
+    language: string | null,
+    opts: { isFork?: boolean; isPrivate?: boolean } = {},
+  ) => ({
+    contributions: { totalCount },
+    repository: {
+      nameWithOwner,
+      isFork: opts.isFork ?? false,
+      isPrivate: opts.isPrivate ?? false,
+      primaryLanguage: language ? { name: language } : null,
+    },
+  });
+
+  const USER_LANGS = {
+    ...USER,
+    repositories: {
+      totalCount: 2,
+      nodes: [ownedNode("someuser/own-ts", "TypeScript"), ownedNode("someuser/own-empty", null)],
+    },
+    recent: {
+      ...USER.recent,
+      commitContributionsByRepository: [
+        contrib("acme/api", 10, "Go"), // qualifies -> counts
+        contrib("acme/cli", 3, "Rust"), // exactly at the threshold -> counts
+        contrib("acme/driveby", 2, "Elixir"), // below threshold -> excluded
+        contrib("acme/forked", 50, "Java", { isFork: true }), // fork -> excluded
+        contrib("acme/secret", 99, "Kotlin", { isPrivate: true }), // private -> excluded
+        contrib("acme/docs", 8, null), // no classified language -> excluded
+        contrib("someuser/own-ts", 20, "TypeScript"), // dup of an owned repo -> not double-counted
+      ],
+    },
+  };
+
+  const langsOf = (payload: Awaited<ReturnType<typeof fetchProfile>>) =>
+    new Set(payload.languageRepos.map((r) => r.language).filter(Boolean));
+
+  it("requests commit contributions by repository in the profile query", async () => {
+    scriptFetch((_t, body) => (body.includes("query Profile") ? ok({ data: { user: USER_LANGS } }) : ok({ data: { user: {} } })));
+    await fetchProfile(LOGIN, NOW);
+    expect(calls[0].body).toContain("commitContributionsByRepository");
+  });
+
+  it("folds contributed public repos into the language set, deduped against owned repos", async () => {
+    scriptFetch((_t, body) => (body.includes("query Profile") ? ok({ data: { user: USER_LANGS } }) : ok({ data: { user: {} } })));
+    const payload = await fetchProfile(LOGIN, NOW);
+
+    // TypeScript (owned) + Go + Rust (contributed). One entry per repo, deduped:
+    // own-ts, own-empty(null), acme/api, acme/cli = 4 rows; 3 distinct languages.
+    expect(payload.languageRepos).toHaveLength(4);
+    expect(langsOf(payload)).toEqual(new Set(["TypeScript", "Go", "Rust"]));
+  });
+
+  it("excludes forks, private repos, drive-by (< 3 commits) and unclassified repos", async () => {
+    scriptFetch((_t, body) => (body.includes("query Profile") ? ok({ data: { user: USER_LANGS } }) : ok({ data: { user: {} } })));
+    const langs = langsOf(await fetchProfile(LOGIN, NOW));
+    for (const excluded of ["Java", "Kotlin", "Elixir"]) expect(langs.has(excluded)).toBe(false);
+  });
+
+  it("still yields no languages when there are neither owned nor qualifying contributed repos", async () => {
+    // The baseline USER: empty owned repos and no commit-by-repo contributions.
+    scriptFetch((_t, body) => okFor(body));
+    const payload = await fetchProfile(LOGIN, NOW);
+    expect(payload.languageRepos).toEqual([]);
+  });
+});

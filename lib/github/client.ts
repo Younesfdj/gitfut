@@ -31,6 +31,15 @@ export interface RawRepo {
   pushedAt: string;
 }
 
+// A repo reduced to just its primary language — the unit the language-diversity
+// signal counts. The scored list is the UNION of a user's owned repos and the
+// public repos they've recently committed to (deduped by repo, built in
+// normalize), so a developer whose work lives in orgs they don't *own* still gets
+// a real language profile instead of a "0 languages" card.
+export interface RawRepoLanguage {
+  language: string | null;
+}
+
 // Flat, normalized profile — all fields below are real GitHub data.
 export interface RawPayload {
   login: string;
@@ -40,7 +49,8 @@ export interface RawPayload {
   createdAt: string;
   followers: number;
   publicRepos: number;
-  repos: RawRepo[]; // owned, non-fork, top 100 by stars
+  repos: RawRepo[]; // owned, non-fork, top 100 by stars (drives the star signals)
+  languageRepos: RawRepoLanguage[]; // owned ∪ recently-contributed public repos, deduped — the language signal
   recentCommits: number; // the "recent" fields cover the last 365 days
   recentPRs: number;
   recentReviews: number;
@@ -59,6 +69,10 @@ const ENDPOINT = "https://api.github.com/graphql";
 const VALID = /^(?=.*[a-z\d])[a-z\d-]{1,39}$/i;
 const GITHUB_EPOCH_YEAR = 2008; // GitHub launched Feb 2008; no account predates it.
 const LIFETIME_BATCH = 4; // contribution windows per request — stays well under GitHub's timeout.
+// A repo only feeds the language signal once the user has really worked in it —
+// this many commits in the last year — so a single drive-by typo fix to a large
+// polyglot repo can't inflate their language diversity.
+const MIN_CONTRIBUTED_LANG_COMMITS = 3;
 // Abort a GitHub request that hangs at the socket level, instead of letting it
 // hang the whole scout (and, under load, starve other requests). Kept BELOW
 // Vercel's ~10s serverless function cap: at 8s we still get to return a clean
@@ -82,6 +96,7 @@ interface UserNode {
   repositories: {
     totalCount: number;
     nodes: {
+      nameWithOwner: string;
       stargazerCount: number;
       primaryLanguage: { name: string } | null;
       createdAt: string;
@@ -94,6 +109,17 @@ interface UserNode {
     totalPullRequestReviewContributions: number;
     totalIssueContributions: number;
     restrictedContributionsCount: number; // private contributions, when the user shows them
+    // Public repos the user committed to in the last year, with each repo's
+    // primary language — the source for counting languages beyond owned repos.
+    commitContributionsByRepository: {
+      contributions: { totalCount: number };
+      repository: {
+        nameWithOwner: string;
+        isFork: boolean;
+        isPrivate: boolean;
+        primaryLanguage: { name: string } | null;
+      };
+    }[];
     contributionCalendar: { weeks: { contributionDays: { contributionCount: number }[] }[] };
   };
 }
@@ -184,7 +210,7 @@ function profileQuery(): string {
         followers { totalCount }
         repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
           totalCount
-          nodes { stargazerCount primaryLanguage { name } createdAt pushedAt }
+          nodes { nameWithOwner stargazerCount primaryLanguage { name } createdAt pushedAt }
         }
         recent: contributionsCollection {
           totalCommitContributions
@@ -192,6 +218,10 @@ function profileQuery(): string {
           totalPullRequestReviewContributions
           totalIssueContributions
           restrictedContributionsCount
+          commitContributionsByRepository(maxRepositories: 100) {
+            contributions { totalCount }
+            repository { nameWithOwner isFork isPrivate primaryLanguage { name } }
+          }
           contributionCalendar { weeks { contributionDays { contributionCount } } }
         }
       }
@@ -299,6 +329,27 @@ function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
     pushedAt: n.pushedAt,
   }));
 
+  // Language diversity is scored over the UNION of the repos a user *owns* and the
+  // public repos they've recently *committed to*, deduped by repo. Owning is only
+  // one way to work in a language — a professional whose real code lives in orgs
+  // they don't own would otherwise score "0 languages". Seed with owned repos
+  // (authoritative, language may be null), then fold in each qualifying contributed
+  // repo not already counted: public, non-fork, with a real commit footprint and a
+  // language GitHub could classify. Private repos stay a bare contribution count in
+  // GitHub's API (no repo/language), so they can't be counted here either.
+  const languageByRepo = new Map<string, string | null>();
+  for (const n of user.repositories.nodes) {
+    languageByRepo.set(n.nameWithOwner, n.primaryLanguage?.name ?? null);
+  }
+  for (const c of user.recent.commitContributionsByRepository ?? []) {
+    const r = c.repository;
+    if (r.isFork || r.isPrivate || !r.primaryLanguage) continue;
+    if (c.contributions.totalCount < MIN_CONTRIBUTED_LANG_COMMITS) continue;
+    if (languageByRepo.has(r.nameWithOwner)) continue;
+    languageByRepo.set(r.nameWithOwner, r.primaryLanguage.name);
+  }
+  const languageRepos: RawRepoLanguage[] = [...languageByRepo.values()].map((language) => ({ language }));
+
   const recentActiveDays = user.recent.contributionCalendar.weeks.reduce(
     (days, w) => days + w.contributionDays.filter((d) => d.contributionCount > 0).length,
     0,
@@ -313,6 +364,7 @@ function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
     followers: user.followers.totalCount,
     publicRepos: user.repositories.totalCount,
     repos,
+    languageRepos,
     recentCommits: user.recent.totalCommitContributions,
     recentPRs: user.recent.totalPullRequestContributions,
     recentReviews: user.recent.totalPullRequestReviewContributions,

@@ -12,11 +12,14 @@ export function signalsFromPayload(p: RawPayload, now = Date.now()): Signals {
 
   const total_stars_owned = p.repos.reduce((s, r) => s + r.stars, 0);
   const max_repo_stars = p.repos.reduce((m, r) => Math.max(m, r.stars), 0);
-  const langs = new Set(p.repos.map((r) => r.language).filter(Boolean) as string[]);
+  // Counted over the UNION of owned repos and public repos the user has recently
+  // committed to (deduped in the client) — so work in orgs a developer doesn't
+  // *own* still counts, instead of a misleading "0 languages" for org/team devs.
+  const langs = new Set(p.languageRepos.map((r) => r.language).filter(Boolean) as string[]);
   const languages = langs.size;
   // Primary languages ranked by repo count, programming languages floated above
   // styling/markup (CSS/HTML) — the #1 drives the card's language + logo.
-  const rankedLanguages = rankLanguages(p.repos);
+  const rankedLanguages = rankLanguages(p.languageRepos);
 
   const years = new Set<number>();
   for (const r of p.repos) {
