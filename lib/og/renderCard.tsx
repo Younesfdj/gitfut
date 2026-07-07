@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { Card, StatKey } from "@/lib/scoring/types";
 import { resolveCardTheme } from "@/components/finishTheme";
 import { languageLogoUrl } from "@/lib/github/languages";
+import { cardDisplayName } from "@/lib/text";
 import { loadCardFonts } from "./card";
 
 // Server-side re-creation of the in-app PlayerCard (components/PlayerCard.tsx),
@@ -143,8 +144,7 @@ export function cardTree(card: Card, assets: CardAssets, w: number) {
   const at = (left: number, top: number) => ({ position: "absolute" as const, left: `${left}%`, top: `${top}%` });
   const t = resolveCardTheme(card);
   const ink = t.ink;
-  const full = card.name.trim();
-  const displayName = (full.length <= 9 ? full : full.split(" ").slice(-1)[0]).toUpperCase();
+  const displayName = cardDisplayName(card.name).toUpperCase();
   const { bg, avatar, flag, logo, avW, avH } = assets;
 
   return (
