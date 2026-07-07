@@ -139,11 +139,17 @@ export default function FlagPicker({ value, onChange }: Props) {
       {open && (
         <div
           role="presentation"
-          className="animate-pop pointer-events-auto absolute z-30 w-[280px] max-w-[80vw] overflow-hidden rounded-[14px] border border-line bg-panel/95 shadow-[0_18px_46px_-12px_rgba(0,0,0,.7)] backdrop-blur-[10px]"
-          // anchor below the flag slot
-          style={{ left: SLOT.left, top: `calc(${SLOT.top} + ${SLOT.height} + 2.5%)` }}
+          className="animate-pop pointer-events-auto absolute z-30 flex w-[280px] max-w-[80vw] flex-col overflow-hidden rounded-[14px] border border-line bg-panel/95 shadow-[0_18px_46px_-12px_rgba(0,0,0,.7)] backdrop-blur-[10px]"
+          // Anchored below the flag slot and capped to the card's own height so
+          // the list can't spill past the card onto the action buttons below it
+          // (issue #35). % resolves against the card-sized root; list scrolls.
+          style={{
+            left: SLOT.left,
+            top: `calc(${SLOT.top} + ${SLOT.height} + 2.5%)`,
+            maxHeight: `calc(100% - ${SLOT.top} - ${SLOT.height} - 6%)`,
+          }}
         >
-          <div className="relative border-b border-line/70 p-[10px]">
+          <div className="relative shrink-0 border-b border-line/70 p-[10px]">
             <Search
               size={15}
               className="pointer-events-none absolute left-[20px] top-1/2 -translate-y-1/2 text-ink-mute"
@@ -171,7 +177,7 @@ export default function FlagPicker({ value, onChange }: Props) {
             id={listId}
             role="listbox"
             aria-label="Countries"
-            className="max-h-[240px] overflow-y-auto overscroll-contain p-[6px]"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[6px]"
           >
             {/* clear affordance — only when a flag is set and not mid-search, so
                 the user can return the card to "no flag". */}
