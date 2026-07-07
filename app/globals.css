@@ -297,6 +297,32 @@
   }
 }
 
+/* ---- duel fixture plate ---- */
+/* a floodlight sheen that crosses the plate once, then rests — the long tail
+   keeps the sweep rare enough to catch the eye without nagging it */
+@keyframes duel-sweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  9%,
+  100% {
+    transform: translateX(110%);
+  }
+}
+
+/* the kickoff dot on the centre spot, waiting for the whistle */
+@keyframes ball-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.7);
+    opacity: 0.6;
+  }
+}
+
 /* gentle float for hero card/mascot */
 @keyframes float {
   0%,
