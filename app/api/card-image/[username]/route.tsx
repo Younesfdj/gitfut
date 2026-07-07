@@ -15,13 +15,17 @@ const H = 1230;
 // A failed scout (no such user) or a render error falls back to a small branded hint.
 export async function GET(req: Request, { params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
-  // Let embeds pin a flag: gitfut.com/<user>.png?country=fr (the .png rewrite keeps
-  // the query). A valid override wins, else the GitHub-derived flag — same priority
-  // as the page and JSON API.
-  const override = new URL(req.url).searchParams.get("country");
+  // Let embeds pin a flag or name override: gitfut.com/<user>.png?country=fr&name=Linus
+  const url = new URL(req.url);
+  const override = url.searchParams.get("country");
+  const nameOverride = url.searchParams.get("name");
   try {
     const card = await scoutCard(username);
-    return await renderCardImage({ ...card, country: pickFlag(override, card.country) ?? "" });
+    const updatedCard = { ...card, country: pickFlag(override, card.country) ?? "" };
+    if (nameOverride) {
+      updatedCard.name = nameOverride;
+    }
+    return await renderCardImage(updatedCard);
   } catch {
     return fallback(username);
   }

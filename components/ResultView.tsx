@@ -24,10 +24,14 @@ interface Props {
   onBack: () => void;
   /** Edit the card's flag from the report (click-the-flag picker). */
   onCountryChange: (code: string) => void;
+  /** Edit the card's name from the report. */
+  onNameChange: (name: string) => void;
   /** Repo stars for the footer credit's star/repo link (null = no count shown). */
   stars?: number | null;
   /** GitHub-derived flag; share links only carry ?country= when it's overridden. */
   canonicalCountry?: string;
+  /** GitHub-derived name; share links only carry ?name= when it's overridden. */
+  canonicalName?: string;
 }
 
 // Card width scales with the viewport but is bounded by BOTH width and height
@@ -45,8 +49,10 @@ export default function ResultView({
   card,
   onBack,
   onCountryChange,
+  onNameChange,
   stars,
   canonicalCountry = "",
+  canonicalName = "",
 }: Props) {
   const captureRef = useRef<HTMLDivElement>(null);
   const storyRef = useRef<HTMLDivElement>(null);
@@ -135,7 +141,7 @@ export default function ResultView({
       </div>
 
       <div className="shrink-0">
-        <ReportHeader card={card} />
+        <ReportHeader card={card} onNameChange={onNameChange} />
       </div>
 
       <div className="mt-[clamp(14px,2.4vh,26px)] grid grid-cols-[1fr_auto_1fr] items-start gap-[clamp(16px,2.4vw,40px)] max-[980px]:mt-6 max-[980px]:flex max-[980px]:flex-col max-[980px]:items-center">
@@ -184,6 +190,7 @@ export default function ResultView({
               targetRef={captureRef}
               storyRef={storyRef}
               canonicalCountry={canonicalCountry}
+              canonicalName={canonicalName}
             />
           </div>
         </div>

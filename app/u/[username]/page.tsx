@@ -25,13 +25,21 @@ const loadCard = cache(
   },
 );
 
-export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ username: string }>;
+  searchParams: Promise<{ country?: string; name?: string }>;
+}): Promise<Metadata> {
   const { username } = await params;
+  const { name: nameOverride } = await searchParams;
   const res = await loadCard(username);
   if ("card" in res) {
+    const displayName = nameOverride || res.card.name;
     return {
-      title: `${res.card.name} — ${res.card.overall} ${res.card.finishLabel} · GitFut`,
-      description: `${res.card.name} scouted on GitFut: ${res.card.overall} OVR ${res.card.position}, ${res.card.archetype}.`,
+      title: `${displayName} — ${res.card.overall} ${res.card.finishLabel} · GitFut`,
+      description: `${displayName} scouted on GitFut: ${res.card.overall} OVR ${res.card.position}, ${res.card.archetype}.`,
       alternates: { canonical: `/${res.card.login}` },
       twitter: { card: "summary_large_image" },
       // og:image comes from the file-convention opengraph-image.tsx (the landscape
@@ -72,10 +80,10 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ username: string }>;
-  searchParams: Promise<{ country?: string }>;
+  searchParams: Promise<{ country?: string; name?: string }>;
 }) {
   const { username } = await params;
-  const { country: override } = await searchParams;
+  const { country: override, name: nameOverride } = await searchParams;
   // Stars feed the footer "Support the project" link; fetched alongside the
   // scout (its own 1h cache keeps it cheap) so the report matches the home page.
   const [res, stars] = await Promise.all([loadCard(username), getRepoStars()]);
@@ -84,17 +92,27 @@ export default async function Page({
   // else's card.
   let card: Card | null = "card" in res ? res.card : null;
   let canonicalCountry = ""; // GitHub-derived flag; share links omit ?country= unless overridden
+  let canonicalName = "";
   if (card) {
     after(() => recordScout()); // analytics, flushed after the response (serverless-safe)
     canonicalCountry = pickFlag(null, card.country) ?? ""; // GitHub-derived only
+    canonicalName = card.name;
     const displayCountry = pickFlag(override, card.country) ?? "";
     card = { ...card, country: displayCountry };
+    if (nameOverride) {
+      card = { ...card, name: nameOverride };
+    }
   }
   return (
     <div className="relative min-h-screen overflow-x-hidden text-ink">
       <Background />
       {card ? (
-        <ScoutRoute card={card} stars={stars} canonicalCountry={canonicalCountry} />
+        <ScoutRoute
+          card={card}
+          stars={stars}
+          canonicalCountry={canonicalCountry}
+          canonicalName={canonicalName}
+        />
       ) : (
         <NotScouted username={username} error={(res as { error: GithubError }).error} />
       )}

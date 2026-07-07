@@ -38,8 +38,15 @@ async function tryCard(username: string): Promise<Card | null> {
   }
 }
 
-export default async function Image({ params }: { params: Promise<{ username: string }> }) {
+export default async function Image({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ username: string }>;
+  searchParams: Promise<{ country?: string; name?: string }>;
+}) {
   const { username } = await params;
+  const { country: override, name: nameOverride } = await searchParams;
   const raw = await tryCard(username);
   if (raw) after(() => recordScout()); // count link unfurls; flushed after response
 
@@ -74,7 +81,10 @@ export default async function Image({ params }: { params: Promise<{ username: st
     );
   }
 
-  const card = { ...raw, country: pickFlag(null, raw.country) ?? "" }; // GitHub-derived flag only
+  const card = { ...raw, country: pickFlag(override, raw.country) ?? "" };
+  if (nameOverride) {
+    card.name = nameOverride;
+  }
   const accent = card.founder?.accent ?? TIER_ACCENT[card.finish] ?? "#39d353";
   const assets = await loadCardAssets(card, CARD_W);
 

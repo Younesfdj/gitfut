@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  Check,
   Clock,
   Crown,
   FastForward,
@@ -11,9 +12,11 @@ import {
   Infinity as InfinityIcon,
   Languages,
   type LucideIcon,
+  Pencil,
   Shield,
   Star,
   Users,
+  X,
   Zap,
 } from "lucide-react";
 import type { Card, Finish, Metric, Playstyle } from "@/lib/scoring/types";
@@ -220,9 +223,17 @@ function Stagger({ step, children, className }: { step: number; children: React.
 // verdict-at-a-glance) anchors the row; the identity block sits beside it with
 // the name as hero, one clean meta line, and the verdict inline. No centered
 // stack, no floating pill, no decorative flanking rules.
-export function ReportHeader({ card }: { card: Card }) {
+export function ReportHeader({ card, onNameChange }: { card: Card; onNameChange: (name: string) => void }) {
   const theme = resolveResultTheme(card);
   const accent = theme.ink;
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempName, setTempName] = useState(card.name);
+
+  // Sync tempName with card.name when card.name changes
+  useEffect(() => {
+    setTempName(card.name);
+  }, [card.name]);
+
   return (
     <header className="relative mx-auto flex max-w-[640px] items-center gap-[clamp(16px,3vw,28px)]">
       {/* left — the grade stamp: OVR over tier, the dossier's headline metric */}
@@ -262,20 +273,69 @@ export function ReportHeader({ card }: { card: Card }) {
             className="animate-glow pointer-events-none absolute -left-[6%] top-1/2 -z-10 h-[160%] w-[70%] -translate-y-1/2 rounded-full blur-[42px]"
             style={{ background: `radial-gradient(closest-side, ${theme.glow}, transparent 72%)` }}
           />
-          <h2
-            className="font-display mt-[2px] truncate text-[clamp(32px,5.4vw,56px)] font-black leading-[.92]"
-            style={{
-              backgroundImage: `linear-gradient(100deg, #e6edf3 0%, #e6edf3 38%, ${accent} 50%, #fff 54%, #e6edf3 64%, #e6edf3 100%)`,
-              backgroundSize: "220% 100%",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-              filter: `drop-shadow(0 2px 14px ${accent}38)`,
-              animation: "gf-name-shimmer 4.5s ease-in-out 0.6s both",
-            }}
-          >
-            {card.name}
-          </h2>
+          {isEditing ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (tempName.trim()) {
+                  onNameChange(tempName.trim());
+                  setIsEditing(false);
+                }
+              }}
+              className="mt-[2px] flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={tempName}
+                onChange={(e) => setTempName(e.target.value)}
+                className="font-display h-[42px] w-full max-w-[280px] rounded-lg border border-white/10 bg-[#161b22] px-3 text-[18px] font-bold text-[#e6edf3] outline-none focus:border-brand/70"
+                autoFocus
+                placeholder="Enter name..."
+              />
+              <button
+                type="submit"
+                aria-label="Confirm name"
+                className="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-lg bg-brand text-[#04130a] transition hover:bg-brand-hi cursor-pointer"
+              >
+                <Check size={18} />
+              </button>
+              <button
+                type="button"
+                aria-label="Cancel editing"
+                onClick={() => {
+                  setTempName(card.name);
+                  setIsEditing(false);
+                }}
+                className="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-lg border border-white/10 bg-white/[0.02] text-ink-soft transition hover:bg-white/[0.06] hover:text-white cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </form>
+          ) : (
+            <div className="group/name flex items-center gap-3 mt-[2px]">
+              <h2
+                className="font-display truncate text-[clamp(32px,5.4vw,56px)] font-black leading-[.92]"
+                style={{
+                  backgroundImage: `linear-gradient(100deg, #e6edf3 0%, #e6edf3 38%, ${accent} 50%, #fff 54%, #e6edf3 64%, #e6edf3 100%)`,
+                  backgroundSize: "220% 100%",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  color: "transparent",
+                  filter: `drop-shadow(0 2px 14px ${accent}38)`,
+                  animation: "gf-name-shimmer 4.5s ease-in-out 0.6s both",
+                }}
+              >
+                {card.name}
+              </h2>
+              <button
+                onClick={() => setIsEditing(true)}
+                aria-label="Edit name"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.02] text-ink-faint transition hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 cursor-pointer"
+              >
+                <Pencil size={14} />
+              </button>
+            </div>
+          )}
         </Stagger>
 
         <Stagger step={3}>
