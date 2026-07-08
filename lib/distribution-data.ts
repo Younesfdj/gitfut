@@ -1,13 +1,17 @@
-// Rating histogram from a uniform random sample of GitHub accounts,
-// scored with this repo's own engine.
-export const DIST_MIN = 50;
-export const DIST_DATE = "2026-07-04";
+// Rating histogram from a uniform random sample of GitHub accounts, scored
+// with this repo's own engine. The data lives in distribution-data.json;
+// regenerate it with distribution-runner.ts (repo root). This module only
+// types and re-exports it so components keep a stable import.
+import dist from "./distribution-data.json";
+
+// Ratings below DIST_MIN are clamped into the first bucket.
+export const DIST_MIN: number = dist.min;
+// Date the sample was taken (the engine evolves; counts are a snapshot).
+export const DIST_DATE: string = dist.date;
 // All sampled accounts: DIST_N in total, of which DIST_COUNTS[i] have
-// overall rating DIST_MIN + i
-export const DIST_N = 18107;
-export const DIST_COUNTS: number[] = [0, 9, 6937, 6156, 1505, 1185, 837, 343, 214, 168, 133, 86, 66, 49, 40, 40, 38, 30, 31, 31, 22, 15, 17, 15, 17, 11, 23, 9, 6, 13, 15, 6, 11, 5, 6, 5, 1, 2, 1, 1, 2, 1, 0, 0, 2, 2, 1, 0, 0, 0];
-// Same sample, restricted to accounts with >= 1 contribution in the past
-// year: DIST_ACTIVE_N in total, of which DIST_ACTIVE_COUNTS[i] have
-// overall rating DIST_MIN + i
-export const DIST_ACTIVE_N = 2118;
-export const DIST_ACTIVE_COUNTS: number[] = [0, 9, 578, 478, 216, 154, 100, 62, 63, 55, 43, 39, 26, 25, 24, 21, 18, 18, 19, 22, 11, 12, 10, 10, 9, 10, 18, 8, 6, 6, 8, 6, 11, 2, 4, 5, 1, 2, 1, 1, 1, 1, 0, 0, 2, 2, 1, 0, 0, 0];
+// overall rating DIST_MIN + i.
+export const DIST_N: number = dist.n;
+export const DIST_COUNTS: number[] = dist.counts;
+// Same sample, restricted to accounts with >= 1 contribution in the past year.
+export const DIST_ACTIVE_N: number = dist.activeN;
+export const DIST_ACTIVE_COUNTS: number[] = dist.activeCounts;
