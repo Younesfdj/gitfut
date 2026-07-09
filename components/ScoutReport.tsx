@@ -53,7 +53,7 @@ const VERDICTS: Record<Finish, string> = {
 };
 
 // Lightweight hover popup explaining why a value was given.
-function Tip({
+export function Tip({
   text,
   align = "center",
   children,
