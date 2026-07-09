@@ -89,9 +89,12 @@ export default function Background() {
           background: "radial-gradient(60% 100% at 50% 100%, rgba(1,4,9,.85), transparent 72%)",
         }}
       />
-      {/* contribution-grid motif, faint along the bottom */}
+      {/* contribution-grid motif, faint along the bottom. Hidden below 980px:
+          narrow layouts stack content much taller than one viewport, so this
+          "floor" strip ends up floating behind mid-page content instead of
+          only at the true bottom. */}
       <div
-        className="absolute bottom-0 left-0 right-0"
+        className="absolute bottom-0 left-0 right-0 max-[980px]:hidden"
         style={{ height: "16%", opacity: 0.5, maskImage: "linear-gradient(to top, #000, transparent)", WebkitMaskImage: "linear-gradient(to top, #000, transparent)" }}
       >
         <ContribGrid />
