@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { Card } from "@/lib/scoring/types";
 import PlayerCard from "./PlayerCard";
 
@@ -18,10 +18,18 @@ interface Props {
   paginate?: boolean;
 }
 
+function cardsKey(cards: Card[]): string {
+  return cards.map((c) => c.login).join("|");
+}
+
 export default function CardFan({ cards, onPick, paginate = true }: Props) {
   const [hover, setHover] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
-  const [page, setPage] = useState(0);
+  // Store page with the cards identity so a new result set resets to page 0
+  // without an effect (avoids react-hooks/set-state-in-effect).
+  const key = cardsKey(cards);
+  const [pageState, setPageState] = useState({ key, page: 0 });
+  const page = pageState.key === key ? pageState.page : 0;
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
 
@@ -40,19 +48,9 @@ export default function CardFan({ cards, onPick, paginate = true }: Props) {
   const center = (pageCards.length - 1) / 2;
   const canPage = paginate && pageCount > 1;
 
-  useEffect(() => {
-    setPage(0);
-    pageRef.current = 0;
-    setDragX(0);
-  }, [cards]);
-
-  useEffect(() => {
-    pageRef.current = safePage;
-  }, [safePage]);
-
   const goTo = (next: number) => {
     const clamped = Math.max(0, Math.min(pageCount - 1, next));
-    setPage(clamped);
+    setPageState({ key, page: clamped });
     pageRef.current = clamped;
   };
 
@@ -60,6 +58,7 @@ export default function CardFan({ cards, onPick, paginate = true }: Props) {
     if (!canPage) return;
     // Ignore secondary buttons; allow touch + primary mouse.
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    pageRef.current = safePage;
     startX.current = e.clientX;
     startY.current = e.clientY;
     axis.current = "none";

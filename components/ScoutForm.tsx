@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { askExampleChips } from "@/lib/scoutAsk/catalog";
 import type { AskResult, HomeMode, TemplateVariable } from "@/lib/scoutAsk/types";
 import { COUNTRIES } from "@/lib/countries";
@@ -114,11 +114,7 @@ export default function ScoutForm({
 }: Props) {
   const [name, setName] = useState("");
   const [askQuery, setAskQuery] = useState("");
-  const [chips, setChips] = useState<string[]>([]);
-
-  useEffect(() => {
-    setChips(askExampleChips());
-  }, []);
+  const [chips] = useState(askExampleChips);
 
   const submitScout = (e: React.FormEvent) => {
     e.preventDefault();
