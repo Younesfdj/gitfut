@@ -4,18 +4,24 @@ import { useEffect, useState } from "react";
 
 const CONTRIBUTORS_URL = "https://github.com/younesfdj/gitfut/graphs/contributors";
 
+let cachedCount: number | null = null;
+
 // Footer credit — "Built by @Younes & N amazing contributors". The count is
 // fetched (cached) from /api/contributors; until it lands the number is blurred
 // and then unblurs with a smooth transition, so the line never changes shape.
 // Shared by the home, scout-report and duel footers so they match.
 export default function FooterCredit() {
-  const [count, setCount] = useState<number | null>(null);
+  const [count, setCount] = useState<number | null>(cachedCount);
 
   useEffect(() => {
+    if (cachedCount !== null) return; // already fetched this page load
     fetch("/api/contributors")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d && typeof d.count === "number") setCount(d.count);
+        if (d && typeof d.count === "number") {
+          cachedCount = d.count;
+          setCount(d.count);
+        }
       })
       .catch(() => {});
   }, []);
