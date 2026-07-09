@@ -8,6 +8,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import dynamic from "next/dynamic";
 import FooterCredit from "@/components/FooterCredit";
 import BuyMeACoffee from "@/components/BuyMeACoffee";
+import SupportProductHunt from "@/components/SupportProductHunt";
 import GithubStar from "@/components/GithubStar";
 import { SAMPLE_CARDS } from "@/lib/github/samples";
 
@@ -75,6 +76,7 @@ export default function AppShell({
       </main>
 
       <BuyMeACoffee />
+      <SupportProductHunt />
 
       {modalOpen && <HowItWorksModal onClose={() => setModalOpen(false)} />}
       <WhatsNew />

@@ -12,6 +12,7 @@ import Mascot from "./Mascot";
 import FooterCredit from "./FooterCredit";
 import GithubStar from "./GithubStar";
 import BuyMeACoffee from "./BuyMeACoffee";
+import SupportProductHunt from "./SupportProductHunt";
 import { XLogo } from "./BrandIcons";
 import { duelThemes, resolveCardTheme, rgba } from "./finishTheme";
 import { useDuelReveal } from "@/hooks/useReveal";
@@ -671,6 +672,7 @@ export default function DuelView({
         </footer>
       </main>
 
+      <SupportProductHunt />
       <BuyMeACoffee />
     </>
   );
