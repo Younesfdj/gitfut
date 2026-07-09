@@ -28,7 +28,7 @@ const COUNTRY: Record<string, string> = {
   lithuania: "lt", latvia: "lv", estonia: "ee", iceland: "is", luxembourg: "lu", belarus: "by",
   kazakhstan: "kz", "saudi arabia": "sa", "united arab emirates": "ae", uae: "ae", qatar: "qa",
   iran: "ir", iraq: "iq", morocco: "ma", kenya: "ke", ghana: "gh", ethiopia: "et", tunisia: "tn",
-  algeria: "dz", "sri lanka": "lk", nepal: "np", cambodia: "kh", myanmar: "mm", ecuador: "ec",
+  algeria: "dz", botswana: "bw", "sri lanka": "lk", nepal: "np", cambodia: "kh", myanmar: "mm", ecuador: "ec",
   uruguay: "uy", "costa rica": "cr", cuba: "cu", "dominican republic": "do", guatemala: "gt",
   bolivia: "bo", paraguay: "py", armenia: "am", azerbaijan: "az", cyprus: "cy", malta: "mt", moldova: "md",
 };
@@ -54,6 +54,7 @@ const CITY: Record<string, string> = {
   "buenos aires": "ar", "mexico city": "mx", seoul: "kr", taipei: "tw", "ho chi minh city": "vn", hanoi: "vn",
   bangkok: "th", jakarta: "id", manila: "ph", "kuala lumpur": "my", auckland: "nz", wellington: "nz",
   dubai: "ae", "abu dhabi": "ae", cairo: "eg", lagos: "ng", nairobi: "ke", bogotá: "co", bogota: "co", tbilisi: "ge",
+  gaborone: "bw", francistown: "bw", maun: "bw",
 };
 
 const US_STATES = new Set([
