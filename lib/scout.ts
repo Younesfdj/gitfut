@@ -1,7 +1,8 @@
 import "server-only";
+import { cache } from "react";
 import { redis } from "./redis";
 import { buildCard } from "./scoring/engine";
-import { fetchProfile } from "./github/client";
+import { fetchProfile, type GithubError } from "./github/client";
 import { signalsFromPayload } from "./github/signals";
 import { SAMPLE_CARDS } from "./github/samples";
 import type { Card } from "./scoring/types";
@@ -92,3 +93,18 @@ export async function scoutCard(username: string): Promise<Card> {
   inflight.set(login, pending);
   return pending;
 }
+
+// Request-memoised card load that returns the scout error instead of throwing,
+// so a route's generateMetadata + Page — and a Duel's two corners — share one
+// scout per request and render the failure state themselves. The cross-request
+// Redis cache lives in scoutCard above; this cache() only dedupes within a
+// single request/render pass.
+export const loadCard = cache(
+  async (username: string): Promise<{ card: Card } | { error: GithubError }> => {
+    try {
+      return { card: await scoutCard(username) };
+    } catch (e) {
+      return { error: e as GithubError };
+    }
+  },
+);

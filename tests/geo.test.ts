@@ -34,3 +34,26 @@ describe("countryFromLocation — UK home nations", () => {
     expect(countryFromLocation("nowhere-ville")).toBeNull();
   });
 });
+
+// "Georgia" is both the country and a US state; a bare name reads as the country,
+// and only reads as the US state when the location also points at the US.
+describe("countryFromLocation — Georgia (country vs US state)", () => {
+  it("reads an unqualified 'Georgia' as the country", () => {
+    expect(countryFromLocation("Georgia")).toBe("ge");
+    expect(countryFromLocation("Tbilisi, Georgia")).toBe("ge");
+    expect(countryFromLocation("Georgia 🇬🇪")).toBe("ge");
+    expect(countryFromLocation("Georgia, Europe")).toBe("ge");
+  });
+
+  it("reads it as the US state when the location points at the US", () => {
+    expect(countryFromLocation("Georgia, USA")).toBe("us");
+    expect(countryFromLocation("Georgia, United States")).toBe("us");
+    expect(countryFromLocation("Atlanta, Georgia")).toBe("us");
+    expect(countryFromLocation("Georgia, Atlanta")).toBe("us"); // US city in a later segment
+  });
+
+  it("still resolves other US states to the US", () => {
+    expect(countryFromLocation("Texas")).toBe("us");
+    expect(countryFromLocation("Ohio, USA")).toBe("us");
+  });
+});

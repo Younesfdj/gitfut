@@ -16,14 +16,16 @@
 
 const CDN_BASE = "https://cdn.jsdelivr.net/gh/devicons/devicon/icons";
 
-// Devicon draws a handful of languages in a style that clashes with the card art
-// — notably C, whose `c-original` is a beveled teal badge that reads as a muddy
-// blob over the player photo. For those we override back to the flat
-// `programming-languages-logos` catalog (the old 18-icon source), whose PNGs are
-// clean, full-colour, transparent — exactly how the card looked before. Keyed by
-// Devicon slug → full logo URL; add a language here if its Devicon icon looks bad.
+// Per-language logo overrides, for two cases: (1) Devicon draws it in a style that
+// clashes with the card art — notably C, whose `c-original` is a beveled teal badge
+// that reads as a muddy blob over the player photo; and (2) Devicon has no icon at
+// all — like ReScript. Keyed by our slug → full logo URL on any CDN that serves a
+// clean, full-colour, transparent asset. Add a language here when Devicon's icon
+// looks bad or is missing.
 const LOGO_URL_OVERRIDES: Record<string, string> = {
   "c-original": "https://cdn.jsdelivr.net/npm/programming-languages-logos/src/c/c.png",
+  // Devicon has no ReScript icon; use Material Icon Theme's (the coral ReScript mark).
+  rescript: "https://cdn.jsdelivr.net/gh/PKief/vscode-material-icon-theme/icons/rescript.svg",
 };
 
 // GitHub primaryLanguage.name (lowercased) → Devicon icon id ("<dir>-<variant>").
@@ -70,6 +72,7 @@ export const LANGUAGE_SLUGS: Record<string, string> = {
   crystal: "crystal-original",
   solidity: "solidity-original",
   nim: "nim-original",
+  rescript: "rescript", // override-only (Devicon lacks it) — see LOGO_URL_OVERRIDES
 };
 
 // Styling / markup / prose / data / config languages (lowercased). These inflate

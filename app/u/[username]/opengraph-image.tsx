@@ -56,7 +56,7 @@ export default async function Image({ params }: { params: Promise<{ username: st
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            background: "#0d1117",
+            background: "#02001e",
             backgroundImage: "radial-gradient(900px 500px at 50% -10%, rgba(57,211,83,0.16), transparent 60%)",
             color: "#e6edf3",
             fontFamily: "DINPro",
@@ -86,7 +86,7 @@ export default async function Image({ params }: { params: Promise<{ username: st
           height: "100%",
           display: "flex",
           alignItems: "center",
-          background: "#0d1117",
+          background: "#02001e",
           backgroundImage:
             "radial-gradient(760px 520px at 22% 12%, rgba(57,211,83,0.14), transparent 60%), radial-gradient(720px 520px at 100% 110%, rgba(212,175,55,0.10), transparent 60%)",
           color: "#e6edf3",

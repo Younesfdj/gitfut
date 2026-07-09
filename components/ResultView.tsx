@@ -6,17 +6,20 @@ import type { Card } from "@/lib/scoring/types";
 import PlayerCard from "./PlayerCard";
 import StoryFrame from "./StoryFrame";
 import CardActions from "./CardActions";
+import DuelButton from "./DuelButton";
 import FlagPicker from "./FlagPicker";
 import Mascot from "./Mascot";
 import FooterCredit from "./FooterCredit";
 import BuyMeACoffee from "./BuyMeACoffee";
 import GithubStar from "./GithubStar";
-import HowItWorksModal from "./HowItWorksModal";
+import dynamic from "next/dynamic";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
 import DistributionPanel from "./DistributionPanel";
-import { resolveResultTheme } from "./finishTheme";
+import { confettiPalette, resolveResultTheme } from "./finishTheme";
 import { useReveal } from "@/hooks/useReveal";
 import { burstConfetti } from "@/lib/confetti";
+
+const HowItWorksModal = dynamic(() => import("./HowItWorksModal"), { ssr: false });
 
 interface Props {
   card: Card;
@@ -32,13 +35,6 @@ interface Props {
 // Card width scales with the viewport but is bounded by BOTH width and height
 // (and a hard min/max) so it never overflows a narrow phone or a short laptop.
 const CARD_WIDTH = "clamp(220px, min(80vw, 40vh), 332px)";
-
-// Confetti palette per tier — gold for prestige, green always woven in (brand).
-const CONFETTI: Record<string, string[]> = {
-  toty: ["#e9cc74", "#d4af37", "#7fa8ff", "#ffffff", "#39d353"],
-  icon: ["#e9cc74", "#d4af37", "#f5f0e1", "#ffffff", "#39d353"],
-  totw: ["#39d353", "#e9cc74", "#ffffff", "#7fa8ff"],
-};
 
 export default function ResultView({
   card,
@@ -67,16 +63,11 @@ export default function ResultView({
     return () => clearTimeout(t);
   }, []);
 
-  // Fire confetti when the rare-tier reveal hits its burst. Founders burst in
-  // their own accent (woven with brand green); other tiers use the palette map.
+  // Fire confetti when the rare-tier reveal hits its burst, in the card's own
+  // tier palette (founders burst in their accent) — see finishTheme.
   useEffect(() => {
-    if (phase === "burst") {
-      const palette = card.founder
-        ? [card.founder.accent, "#ffffff", "#39d353"]
-        : (CONFETTI[card.finish] ?? ["#39d353", "#e9cc74", "#ffffff"]);
-      burstConfetti(palette);
-    }
-  }, [phase, card.finish, card.founder]);
+    if (phase === "burst") burstConfetti(confettiPalette(card));
+  }, [phase, card]);
 
   const ignited = phase === "ignite" || phase === "burst" || phase === "freeze";
 
@@ -85,14 +76,18 @@ export default function ResultView({
     <main className="relative z-[2] mx-auto flex min-h-[100dvh] w-full max-w-[1280px] flex-col px-[clamp(16px,4vw,22px)]">
       {/* Tier-reactive backdrop: dims the global green wash and lets the card's
           own tier color own the result screen (green is the action, the card is
-          the prize — they shouldn't fight here). Fades in with the reveal. */}
+          the prize — they shouldn't fight here). Fades in with the reveal. The
+          bottom fade-out keeps it from burying the contribution-grid motif on
+          the floor: full tier wash up top, the grid stays lit below. */}
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 -z-10"
         style={{
-          background: `radial-gradient(120% 80% at 50% -10%, ${theme.glow}, transparent 55%), #0d1117`,
+          background: `radial-gradient(120% 80% at 50% -10%, ${theme.glow}, transparent 55%), #02001e`,
           opacity: ignited ? 0.9 : 0.4,
           transition: "opacity 1s ease",
+          WebkitMaskImage: "linear-gradient(to bottom, #000 68%, rgba(0,0,0,.25) 100%)",
+          maskImage: "linear-gradient(to bottom, #000 68%, rgba(0,0,0,.25) 100%)",
         }}
       />
 
@@ -177,13 +172,14 @@ export default function ResultView({
             </div>
             <FlagPicker value={card.country} onChange={onCountryChange} />
           </div>
-          <div style={{ width: CARD_WIDTH }}>
+          <div className="flex flex-col gap-[10px]" style={{ width: CARD_WIDTH }}>
             <CardActions
               card={card}
               targetRef={captureRef}
               storyRef={storyRef}
               canonicalCountry={canonicalCountry}
             />
+            <DuelButton login={card.login} />
           </div>
         </div>
 

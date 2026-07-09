@@ -68,7 +68,7 @@ Every card walks out in a finish:
 
 <div align="center">
 
-**Built with** Next.js · TypeScript · Tailwind · Redis · Vercel Blob
+**Built with** Next.js · TypeScript · Tailwind · Redis
 
 **[gitfut.com](https://gitfut.com)** &nbsp;·&nbsp; scout someone today
 

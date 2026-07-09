@@ -114,12 +114,17 @@ async function avatarDataUri(url: string, bw: number, bh: number): Promise<strin
 
 // Load all image assets for the card at a given render width. Best-effort: a
 // missing asset degrades gracefully, never throws.
-export async function loadCardAssets(card: Card, w: number) {
+// `withFonts` lets a caller that already has the (identical, static) font set
+// skip re-reading the three .otf files — e.g. the duel poster renders two cards
+// but passes only one card's fonts to ImageResponse.
+export async function loadCardAssets(card: Card, w: number, withFonts = true) {
   const avW = Math.round((w * 68) / 100);
   const avH = Math.round((w * 70) / 100);
   const bgRel = resolveCardTheme(card).bg.replace(/\.webp$/, ".png"); // Satori can't decode webp
   const [fonts, bg, avatar, flag, logo] = await Promise.all([
-    loadCardFonts(),
+    withFonts
+      ? loadCardFonts()
+      : Promise.resolve([] as Awaited<ReturnType<typeof loadCardFonts>>),
     fileDataUri(publicFile(bgRel), "image/png"),
     avatarDataUri(card.avatarUrl, avW, avH),
     card.country ? fileDataUri(publicFile(`/badges/flags/${card.country}.png`), "image/png") : Promise.resolve(null),

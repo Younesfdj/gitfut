@@ -2,6 +2,17 @@ import type { Family, Finish, FounderMeta, StatKey, Stats } from "./types";
 
 export const STATS: StatKey[] = ["pac", "sho", "pas", "dri", "def", "phy"];
 
+// Canonical stat → display abbreviation: the single source for any surface that
+// labels the six stats (the Duel's shootout rows read these).
+export const STAT_LABELS: Record<StatKey, string> = {
+  pac: "PAC",
+  sho: "SHO",
+  pas: "PAS",
+  dri: "DRI",
+  def: "DEF",
+  phy: "PHY",
+};
+
 // The attacking/technical four share sub-skills in real FUT cards (dribbling and
 // pace pull from the same agility/balance traits, etc.), so they're kept cohesive
 // — pulled toward their own group mean after the spike. DEF/PHY stay free: role

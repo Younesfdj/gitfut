@@ -443,10 +443,6 @@ const GENERATED: readonly Country[] = [
     "name": "Isle of Man"
   },
   {
-    "code": "il",
-    "name": "Israel"
-  },
-  {
     "code": "it",
     "name": "Italy"
   },

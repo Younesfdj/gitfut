@@ -24,7 +24,7 @@ export default async function Image() {
           width: "100%",
           height: "100%",
           display: "flex",
-          background: "#0d1117",
+          background: "#02001e",
           backgroundImage:
             "radial-gradient(900px 520px at 22% -12%, rgba(57,211,83,0.20), transparent 60%), radial-gradient(720px 520px at 105% 120%, rgba(212,175,55,0.14), transparent 60%)",
           color: "#e6edf3",

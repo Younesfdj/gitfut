@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { Card } from "@/lib/scoring/types";
-import { cardUrl, intentUrl, nativeSharePayload, shareMessage, shareText } from "@/lib/share";
+import {
+  cardUrl,
+  duelIntentUrl,
+  duelSharePayload,
+  duelShareMessage,
+  duelUrl,
+  intentUrl,
+  nativeSharePayload,
+  shareMessage,
+  shareText,
+} from "@/lib/share";
 
 // We test the share DECISIONS: correct platform endpoints, well-formed encoded
 // URLs, stable per-login text, brag-led message. Not the React wiring.
@@ -88,5 +98,44 @@ describe("share service", () => {
 
   it("share message is the text plus the CTA", () => {
     expect(shareMessage(card())).toContain(shareText(card()));
+  });
+});
+
+describe("duel share service", () => {
+  it("builds the canonical duel URL from both corners", () => {
+    expect(duelUrl("younesfdj", "torvalds")).toBe("https://gitfut.com/younesfdj/vs/torvalds");
+  });
+
+  it("message is deterministic per matchup, @-mentions the opponent, and never spoils the score", () => {
+    const a = duelShareMessage("younesfdj", "torvalds");
+    expect(a).toBe(duelShareMessage("younesfdj", "torvalds"));
+    expect(a).toContain("@torvalds");
+    // Score-free by design — the poster and page never reveal the result.
+    expect(a).not.toMatch(/\d+\s*[–-]\s*\d+/);
+  });
+
+  it("swapping corners can change the line (matchup-seeded, not opponent-only)", () => {
+    const lines = new Set([
+      duelShareMessage("a", "b"),
+      duelShareMessage("b", "a"),
+      duelShareMessage("c", "d"),
+      duelShareMessage("e", "f"),
+    ]);
+    expect(lines.size).toBeGreaterThan(1);
+  });
+
+  it("X intent uses /intent/tweet (NOT /intent/post) with the duel url + hashtag", () => {
+    const u = duelIntentUrl("younesfdj", "torvalds");
+    expect(u).toContain("https://twitter.com/intent/tweet?");
+    expect(u).not.toContain("/intent/post");
+    expect(u).toContain("hashtags=GitFut");
+    expect(u).toContain(encodeURIComponent("https://gitfut.com/younesfdj/vs/torvalds"));
+  });
+
+  it("native payload carries the title, the message, and the duel url", () => {
+    const p = duelSharePayload("younesfdj", "torvalds");
+    expect(p.title).toBe("GitFut Duel");
+    expect(p.url).toBe("https://gitfut.com/younesfdj/vs/torvalds");
+    expect(p.text).toBe(duelShareMessage("younesfdj", "torvalds"));
   });
 });

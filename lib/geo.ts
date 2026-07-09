@@ -21,7 +21,7 @@ const COUNTRY: Record<string, string> = {
   denmark: "dk", danmark: "dk", ireland: "ie", austria: "at", österreich: "at", osterreich: "at",
   belgium: "be", belgique: "be", portugal: "pt", argentina: "ar", mexico: "mx", méxico: "mx",
   "czech republic": "cz", czechia: "cz", romania: "ro", greece: "gr", turkey: "tr", türkiye: "tr", turkiye: "tr",
-  israel: "il", indonesia: "id", "new zealand": "nz", "south africa": "za", nigeria: "ng", egypt: "eg",
+  indonesia: "id", "new zealand": "nz", "south africa": "za", nigeria: "ng", egypt: "eg",
   pakistan: "pk", bangladesh: "bd", vietnam: "vn", "viet nam": "vn", thailand: "th", philippines: "ph",
   malaysia: "my", "hong kong": "hk", taiwan: "tw", colombia: "co", chile: "cl", peru: "pe", venezuela: "ve",
   hungary: "hu", bulgaria: "bg", serbia: "rs", croatia: "hr", slovakia: "sk", slovenia: "si",
@@ -70,6 +70,13 @@ const MULTIWORD: [string, string][] = [...Object.entries(COUNTRY), ...Object.ent
   k.includes(" "),
 );
 
+// "Georgia" is both a country (ge) and a US state. It reads as the US state only
+// when another part of the location points at the US (a US alias, another state,
+// or a US city); an unqualified "Georgia" is taken as the sovereign country.
+function pointsToUS(segments: string[]): boolean {
+  return segments.some((s) => s !== "georgia" && (COUNTRY[s] === "us" || US_STATES.has(s) || CITY[s] === "us"));
+}
+
 export function countryFromLocation(location: string | null | undefined): string | null {
   if (!location) return null;
   const clean = location
@@ -82,6 +89,10 @@ export function countryFromLocation(location: string | null | undefined): string
   const segments = clean.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
 
   for (const seg of segments) {
+    // "Georgia" is both the country (ge) and a US state. Read it as the country
+    // only when nothing else points at the US; otherwise let it fall through to the
+    // US_STATES check below, which flies the US flag (e.g. "Georgia, USA").
+    if (seg === "georgia" && !pointsToUS(segments)) return "ge";
     if (COUNTRY[seg]) return COUNTRY[seg];
     if (US_STATES.has(seg)) return "us";
     if (CITY[seg]) return CITY[seg];

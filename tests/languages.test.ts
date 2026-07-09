@@ -98,3 +98,20 @@ describe("languageLogoUrl", () => {
     );
   });
 });
+
+describe("ReScript (Devicon lacks it — overridden to Material Icon Theme)", () => {
+  it("resolves the slug and headlines its own logo", () => {
+    expect(logoSlugFor("ReScript")).toBe("rescript");
+    expect(topLanguageLogo(["ReScript", "TypeScript"])).toEqual({ name: "ReScript", slug: "rescript" });
+  });
+
+  it("ranks above styling languages like any real language", () => {
+    expect(rankLanguages(repos("CSS", "CSS", "ReScript"))).toEqual(["ReScript", "CSS"]);
+  });
+
+  it("points at a real, full-colour logo URL", () => {
+    expect(languageLogoUrl("rescript")).toBe(
+      "https://cdn.jsdelivr.net/gh/PKief/vscode-material-icon-theme/icons/rescript.svg",
+    );
+  });
+});

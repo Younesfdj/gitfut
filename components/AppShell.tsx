@@ -5,11 +5,16 @@ import { useRouter } from "next/navigation";
 import ScoutForm from "@/components/ScoutForm";
 import CardFan from "@/components/CardFan";
 import LoadingScreen from "@/components/LoadingScreen";
-import HowItWorksModal from "@/components/HowItWorksModal";
+import dynamic from "next/dynamic";
 import FooterCredit from "@/components/FooterCredit";
 import BuyMeACoffee from "@/components/BuyMeACoffee";
 import GithubStar from "@/components/GithubStar";
 import { SAMPLE_CARDS } from "@/lib/github/samples";
+
+const HowItWorksModal = dynamic(() => import("@/components/HowItWorksModal"), { ssr: false });
+// Home-page-only by design: the team-news bulletin mounts here (never in the
+// root layout), so scout/duel pages stay clean.
+const WhatsNew = dynamic(() => import("@/components/WhatsNew"), { ssr: false });
 
 export default function AppShell({ stars, scoutCount }: { stars: number | null; scoutCount: number | null }) {
   const router = useRouter();
@@ -64,6 +69,8 @@ export default function AppShell({ stars, scoutCount }: { stars: number | null; 
       <BuyMeACoffee />
 
       {modalOpen && <HowItWorksModal onClose={() => setModalOpen(false)} />}
+
+      <WhatsNew />
     </>
   );
 }

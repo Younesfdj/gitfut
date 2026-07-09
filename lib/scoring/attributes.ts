@@ -65,17 +65,32 @@ interface MetricDef {
   value: (s: Signals) => number;
 }
 
+// Canonical metric display labels — the single source for every surface that
+// looks a metric up by label (the scout report renders them; lib/duel reads
+// receipts back through them). Renaming here flows everywhere at compile time.
+export const METRIC_LABELS = {
+  commits: "Commits",
+  starsEarned: "Stars earned",
+  topRepoReach: "Top repo reach",
+  pullRequests: "Pull requests",
+  followers: "Followers",
+  languages: "Languages",
+  issues: "Issues",
+  codeReviews: "Code reviews",
+  contributions: "Contributions",
+} as const;
+
 // Core metrics — always shown (a few zeros are fine).
 const CORE_METRICS: MetricDef[] = [
-  { label: "Commits", unit: "commits", ref: 3_000, value: (s) => s.recent_commits },
-  { label: "Stars earned", unit: "stars", ref: 200_000, value: (s) => s.total_stars_owned },
-  { label: "Top repo reach", unit: "stars", ref: 150_000, value: (s) => s.max_repo_stars },
-  { label: "Pull requests", unit: "PRs", ref: 2_000, value: (s) => s.prs_to_others },
-  { label: "Followers", unit: "followers", ref: 100_000, value: (s) => s.followers },
-  { label: "Languages", unit: "languages", ref: 15, value: (s) => s.languages },
-  { label: "Issues", unit: "issues", ref: 1_500, value: (s) => s.issues_closed },
-  { label: "Code reviews", unit: "reviews", ref: 2_000, value: (s) => s.reviews },
-  { label: "Contributions", unit: "contributions", ref: 50_000, value: (s) => s.total_contributions_lifetime },
+  { label: METRIC_LABELS.commits, unit: "commits", ref: 3_000, value: (s) => s.recent_commits },
+  { label: METRIC_LABELS.starsEarned, unit: "stars", ref: 200_000, value: (s) => s.total_stars_owned },
+  { label: METRIC_LABELS.topRepoReach, unit: "stars", ref: 150_000, value: (s) => s.max_repo_stars },
+  { label: METRIC_LABELS.pullRequests, unit: "PRs", ref: 2_000, value: (s) => s.prs_to_others },
+  { label: METRIC_LABELS.followers, unit: "followers", ref: 100_000, value: (s) => s.followers },
+  { label: METRIC_LABELS.languages, unit: "languages", ref: 15, value: (s) => s.languages },
+  { label: METRIC_LABELS.issues, unit: "issues", ref: 1_500, value: (s) => s.issues_closed },
+  { label: METRIC_LABELS.codeReviews, unit: "reviews", ref: 2_000, value: (s) => s.reviews },
+  { label: METRIC_LABELS.contributions, unit: "contributions", ref: 50_000, value: (s) => s.total_contributions_lifetime },
 ];
 
 // Optional metrics — appended only to make up for zeroed core ones (see below).

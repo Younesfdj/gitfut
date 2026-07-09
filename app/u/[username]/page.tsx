@@ -1,10 +1,9 @@
-import { cache } from "react";
 import { after } from "next/server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Background from "@/components/Background";
 import { type GithubError } from "@/lib/github/client";
-import { scoutCard } from "@/lib/scout";
+import { loadCard } from "@/lib/scout";
 import { getRepoStars } from "@/lib/github/stars";
 import { pickFlag } from "@/lib/flagPriority";
 import { recordScout } from "@/lib/analytics";
@@ -12,18 +11,6 @@ import type { Card } from "@/lib/scoring/types";
 import ScoutRoute from "./ScoutRoute";
 
 export const dynamic = "force-dynamic"; // per-user, token-gated, always fresh
-
-// Memoised per request so generateMetadata and the page share one scout. The
-// cross-request cache (and the tokenless sample fallback) live in lib/scout.
-const loadCard = cache(
-  async (username: string): Promise<{ card: Card } | { error: GithubError }> => {
-    try {
-      return { card: await scoutCard(username) };
-    } catch (e) {
-      return { error: e as GithubError };
-    }
-  },
-);
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const { username } = await params;
