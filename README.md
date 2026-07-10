@@ -28,11 +28,22 @@ Your card lives at a URL. Drop it in your profile README, your portfolio, anywhe
 [![My GitFut card](https://gitfut.com/YOUR_USERNAME.png)](https://gitfut.com/YOUR_USERNAME)
 ```
 
+Choose a render size for different embed surfaces:
+
+```md
+[![My GitFut card](https://gitfut.com/YOUR_USERNAME.png?size=small)](https://gitfut.com/YOUR_USERNAME)
+[![My GitFut card](https://gitfut.com/YOUR_USERNAME.png?size=medium)](https://gitfut.com/YOUR_USERNAME)
+[![My GitFut card](https://gitfut.com/YOUR_USERNAME.png?size=large)](https://gitfut.com/YOUR_USERNAME)
+```
+
+`medium` is the default, so existing embeds keep their current size.
+
 | | |
 |---|---|
 | **`gitfut.com/<username>.png`** | your card, as a live image |
 | **`gitfut.com/<username>`** | the full scout report |
 | **`?country=XX`** | override the flag (e.g. `?country=DZ`) |
+| **`?size=small\|medium\|large`** | choose the rendered image size |
 
 <br/>
 

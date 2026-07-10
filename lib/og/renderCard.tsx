@@ -5,6 +5,7 @@ import type { Card, StatKey } from "@/lib/scoring/types";
 import { resolveCardTheme } from "@/components/finishTheme";
 import { languageLogoUrl } from "@/lib/github/languages";
 import { cardDisplayName } from "@/lib/text";
+import { CARD_IMAGE_WIDTHS, cardImageHeightForWidth } from "./cardSize";
 import { loadCardFonts } from "./card";
 
 // Server-side re-creation of the in-app PlayerCard (components/PlayerCard.tsx),
@@ -15,8 +16,8 @@ import { loadCardFonts } from "./card";
 // W. Satori can't do CSS mask-image, so the avatar's feather is baked into the PNG
 // with sharp (see avatarDataUri); everything else matches the live card.
 
-const EMBED_W = 810; // /<user>.png render width (540 native × 1.5 for crispness)
-const cardH = (w: number) => Math.round((w * 820) / 540); // native 540×820 aspect
+const EMBED_W = CARD_IMAGE_WIDTHS.medium; // /<user>.png default render width (540 native × 1.5 for crispness)
+const cardH = cardImageHeightForWidth; // native 540×820 aspect
 
 const pad2 = (n: number) => String(Math.round(n)).padStart(2, "0");
 
@@ -209,11 +210,11 @@ export function cardTree(card: Card, assets: CardAssets, w: number) {
 }
 
 // The standalone embeddable card image: gitfut.com/<user>.png.
-export async function renderCardImage(card: Card): Promise<ImageResponse> {
-  const assets = await loadCardAssets(card, EMBED_W);
-  return new ImageResponse(cardTree(card, assets, EMBED_W), {
-    width: EMBED_W,
-    height: cardH(EMBED_W),
+export async function renderCardImage(card: Card, width: number = EMBED_W): Promise<ImageResponse> {
+  const assets = await loadCardAssets(card, width);
+  return new ImageResponse(cardTree(card, assets, width), {
+    width,
+    height: cardH(width),
     fonts: assets.fonts,
     headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800" },
   });
