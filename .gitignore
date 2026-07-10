@@ -48,5 +48,4 @@ next-env.d.ts
 
 .vercel
 design/
-scripts/
 docs/
