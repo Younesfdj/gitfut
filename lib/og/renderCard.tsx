@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { Card, StatKey } from "@/lib/scoring/types";
 import { resolveCardTheme } from "@/components/finishTheme";
 import { languageLogoUrl } from "@/lib/github/languages";
+import { cardDisplayName } from "@/lib/text";
 import { loadCardFonts } from "./card";
 
 // Server-side re-creation of the in-app PlayerCard (components/PlayerCard.tsx),
@@ -73,9 +74,6 @@ async function fetchDataUri(url: string): Promise<string | null> {
   return r ? `data:${r.mime};base64,${r.buf.toString("base64")}` : null;
 }
 
-// The avatar, feathered into a FUT cut-out the way PlayerCard's AVATAR_MASK does
-// it: real alpha (not a colour overlay), so the card art shows through the soft
-// edges. Satori can't do CSS masks, so we bake the mask into the PNG with sharp.
 // Falls back to the raw photo (then the silhouette) if sharp or the fetch fails.
 async function avatarDataUri(url: string, bw: number, bh: number): Promise<string> {
   const r = await fetchBytes(url);
@@ -85,9 +83,7 @@ async function avatarDataUri(url: string, bw: number, bh: number): Promise<strin
   }
   try {
     const sharp = (await import("sharp")).default;
-    // PlayerCard's AVATAR_MASK is a radial core intersected with a top fade (so the
-    // head dissolves before the card's crest) — both *alpha* gradients, so dest-in
-    // actually feathers. Composited in sequence = the intersection of the two.
+  
     const radialMask = Buffer.from(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${bw}" height="${bh}"><defs><radialGradient id="g" cx="52%" cy="41%" r="62%"><stop offset="50%" stop-color="#fff" stop-opacity="1"/><stop offset="84%" stop-color="#fff" stop-opacity="0"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="${bw}" height="${bh}" fill="url(#g)"/></svg>`,
     );
@@ -114,12 +110,17 @@ async function avatarDataUri(url: string, bw: number, bh: number): Promise<strin
 
 // Load all image assets for the card at a given render width. Best-effort: a
 // missing asset degrades gracefully, never throws.
-export async function loadCardAssets(card: Card, w: number) {
+// `withFonts` lets a caller that already has the (identical, static) font set
+// skip re-reading the three .otf files — e.g. the duel poster renders two cards
+// but passes only one card's fonts to ImageResponse.
+export async function loadCardAssets(card: Card, w: number, withFonts = true) {
   const avW = Math.round((w * 68) / 100);
   const avH = Math.round((w * 70) / 100);
   const bgRel = resolveCardTheme(card).bg.replace(/\.webp$/, ".png"); // Satori can't decode webp
   const [fonts, bg, avatar, flag, logo] = await Promise.all([
-    loadCardFonts(),
+    withFonts
+      ? loadCardFonts()
+      : Promise.resolve([] as Awaited<ReturnType<typeof loadCardFonts>>),
     fileDataUri(publicFile(bgRel), "image/png"),
     avatarDataUri(card.avatarUrl, avW, avH),
     card.country ? fileDataUri(publicFile(`/badges/flags/${card.country}.png`), "image/png") : Promise.resolve(null),
@@ -138,8 +139,7 @@ export function cardTree(card: Card, assets: CardAssets, w: number) {
   const at = (left: number, top: number) => ({ position: "absolute" as const, left: `${left}%`, top: `${top}%` });
   const t = resolveCardTheme(card);
   const ink = t.ink;
-  const full = card.name.trim();
-  const displayName = (full.length <= 9 ? full : full.split(" ").slice(-1)[0]).toUpperCase();
+  const displayName = cardDisplayName(card.name).toUpperCase();
   const { bg, avatar, flag, logo, avW, avH } = assets;
 
   return (

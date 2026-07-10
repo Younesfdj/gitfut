@@ -66,7 +66,7 @@ export default function HowItWorksModal({ onClose }: { onClose: () => void }) {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(3,5,10,.78)] p-[22px] backdrop-blur-[6px]"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-bg-deep/80 p-[22px] backdrop-blur-[6px]"
       style={{ opacity: shown ? 1 : 0, transition: "opacity .25s ease" }}
     >
       <div
@@ -76,7 +76,7 @@ export default function HowItWorksModal({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-labelledby="hiw-title"
         onClick={(e) => e.stopPropagation()}
-        className="relative max-h-[88vh] w-[min(600px,100%)] overflow-auto rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,#12161d,#0b0e13)] p-[clamp(24px,4.5vw,40px)] shadow-[0_40px_120px_rgba(0,0,0,.6)] outline-none"
+        className="relative max-h-[88vh] w-[min(600px,100%)] overflow-auto rounded-[20px] border border-line bg-[linear-gradient(180deg,var(--color-surface-2),var(--color-panel))] p-[clamp(24px,4.5vw,40px)] shadow-[0_40px_120px_rgba(0,0,0,.6)] outline-none"
         style={{
           opacity: shown ? 1 : 0,
           transform: shown ? "translateY(0) scale(1)" : "translateY(14px) scale(.985)",

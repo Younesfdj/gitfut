@@ -115,3 +115,35 @@ export function resolveResultTheme(card: Card): ResultTheme {
   if (!card.founder) return base;
   return { ink: card.founder.accent, glow: rgba(card.founder.accent, 0.34), chip: base.chip };
 }
+
+// ---- Duel kit clash: TOTY/TOTW vs silver, and nothing else ----
+// Those tiers' inks are near-twins (toty #CADBFF vs silver #D6DCE6), so in that
+// one matchup nothing side-coded on the Duel (names, bars, radars, scoreboard)
+// says whose color is whose. The fix is surgical, only for this pairing: the
+// TOTY/TOTW side swaps its pale ink for the tier's own saturated blue — the
+// color its glow already wears — so it reads MORE toty, and silver stays
+// silver. Every other matchup keeps its true tier inks.
+const TOTY_KIT: ResultTheme = { ink: "#7fa8ff", glow: RESULT_THEME.toty.glow, chip: RESULT_THEME.toty.chip };
+const wearsTotyBlue = (f: Finish) => f === "toty" || f === "totw";
+
+export function duelThemes(challenger: Card, opponent: Card): { home: ResultTheme; away: ResultTheme } {
+  const home = resolveResultTheme(challenger);
+  const away = resolveResultTheme(opponent);
+  if (wearsTotyBlue(challenger.finish) && opponent.finish === "silver") return { home: TOTY_KIT, away };
+  if (challenger.finish === "silver" && wearsTotyBlue(opponent.finish)) return { home, away: TOTY_KIT };
+  return { home, away };
+}
+
+// Confetti palette per tier — gold for prestige, green always woven in (brand).
+// Founders burst in their own accent. Consumed by the card reveal (the Duel
+// deliberately keeps its full time clean — no confetti).
+const CONFETTI: Partial<Record<Finish, string[]>> = {
+  toty: ["#e9cc74", "#d4af37", "#7fa8ff", "#ffffff", "#39d353"],
+  icon: ["#e9cc74", "#d4af37", "#f5f0e1", "#ffffff", "#39d353"],
+  totw: ["#39d353", "#e9cc74", "#ffffff", "#7fa8ff"],
+};
+
+export function confettiPalette(card: Card): string[] {
+  if (card.founder) return [card.founder.accent, "#ffffff", "#39d353"];
+  return CONFETTI[card.finish] ?? ["#39d353", "#e9cc74", "#ffffff"];
+}

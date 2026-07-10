@@ -3,6 +3,7 @@
 import { memo, type CSSProperties } from "react";
 import type { Card, StatKey } from "@/lib/scoring/types";
 import { languageLogoUrl } from "@/lib/github/languages";
+import { cardDisplayName } from "@/lib/text";
 import { resolveCardTheme } from "./finishTheme";
 
 // Faithful port of the Python FUT generator's 540×820 layout. Positions are
@@ -25,8 +26,11 @@ const FONT_BOLD = "var(--font-din-bold), 'Saira Condensed', sans-serif";
 // transparent edge) intersected with a bottom fade and a top fade. The opaque
 // cores are widened from the design (46→56, 56→62) so the middle reads more
 // obvious/clear. Raise those #000 stops for an even bigger clear centre.
-const AVATAR_MASK =
-  "radial-gradient(ellipse 66% 88% at 52% 40%, #000 56%, transparent 80%), linear-gradient(220deg, #000 70%, transparent 100%), linear-gradient(180deg, transparent 1%, #000 22%)";
+const AVATAR_MASK_FEATHER =
+  "radial-gradient(ellipse 66% 88% at 52% 40%, #000 56%, transparent 80%)";
+const AVATAR_MASK_BOTTOM_FADE =
+  "linear-gradient(220deg, #000 70%, transparent 100%)";
+const AVATAR_MASK_TOP_FADE = "linear-gradient(180deg, transparent 1%, #000 22%)";
 
 const pad2 = (n: number) => String(Math.round(n)).padStart(2, "0");
 
@@ -62,10 +66,7 @@ const hideOnError: React.ReactEventHandler<HTMLImageElement> = (e) => {
 function PlayerCard({ card }: { card: Card }) {
   const t = resolveCardTheme(card);
   const ink = t.ink;
-  const full = card.name.trim();
-  const displayName = (
-    full.length <= 9 ? full : full.split(" ").slice(-1)[0]
-  ).toUpperCase();
+  const displayName = cardDisplayName(card.name).toUpperCase();
 
   const onAvatarError: React.ReactEventHandler<HTMLImageElement> = (e) => {
     e.currentTarget.onerror = null;
@@ -105,11 +106,8 @@ function PlayerCard({ card }: { card: Card }) {
           objectFit: "fill",
         }}
       />
-
-      {/* Avatar — clipped to the card silhouette (the bg PNG used as a mask) so
-          it can never spill past the frame, then feathered + colour-tinted so
-          any photo, logo or anime blends in like a FUT cut-out. */}
       <div
+        data-gitfut-avatar
         style={{
           position: "absolute",
           inset: 0,
@@ -126,28 +124,49 @@ function PlayerCard({ card }: { card: Card }) {
             top: "13cqw",
             width: "68cqw",
             height: "70cqw",
-            WebkitMaskImage: AVATAR_MASK,
-            maskImage: AVATAR_MASK,
-            WebkitMaskComposite: "source-in",
-            maskComposite: "intersect",
-            filter: `drop-shadow(0 3cqw 6cqw rgba(0,0,0,.5)) drop-shadow(0 0 5cqw ${t.avatarHalo})`,
+            WebkitMaskImage: AVATAR_MASK_FEATHER,
+            maskImage: AVATAR_MASK_FEATHER,
           }}
         >
-          <img
-            src={card.avatarUrl}
-            onError={onAvatarError}
-            alt={card.login}
-            crossOrigin="anonymous"
+          <div
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "cover",
-              objectPosition: "center 20%",
+              WebkitMaskImage: AVATAR_MASK_BOTTOM_FADE,
+              maskImage: AVATAR_MASK_BOTTOM_FADE,
             }}
-          />
-          <div
-            style={{ position: "absolute", inset: 0, background: t.avatarTint }}
-          />
+          >
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                WebkitMaskImage: AVATAR_MASK_TOP_FADE,
+                maskImage: AVATAR_MASK_TOP_FADE,
+                filter: `drop-shadow(0 3cqw 6cqw rgba(0,0,0,.5)) drop-shadow(0 0 5cqw ${t.avatarHalo})`,
+              }}
+            >
+              <img
+                src={card.avatarUrl}
+                onError={onAvatarError}
+                alt={card.login}
+                crossOrigin="anonymous"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  objectPosition: "center 20%",
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: t.avatarTint,
+                }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 

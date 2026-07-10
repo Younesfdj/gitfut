@@ -9,13 +9,13 @@
   --font-sans: var(--font-inter);
   --font-mono: var(--font-jetbrains);
 
-  /* WC26 spine — black / surfaces / gray / ink / gold */
-  --color-bg: #0d1117;
-  --color-bg-deep: #010409;
-  --color-panel: #161b22;
-  --color-surface: #161b22;
-  --color-surface-2: #21262d;
-  --color-line: #30363d;
+  /* WC26 spine — blue-black midnight / surfaces / gray / ink / gold */
+  --color-bg: #02001e;
+  --color-bg-deep: #010012;
+  --color-panel: #0b0930;
+  --color-surface: #0b0930;
+  --color-surface-2: #130f3d;
+  --color-line: #262358;
   --color-gray: #8b949e;
 
   --color-ink: #e6edf3;
@@ -97,6 +97,84 @@
   }
   50% {
     opacity: 0.85;
+  }
+}
+
+/* ---- THE DUEL: mirrored walkouts — each corner enters from its own side ---- */
+@keyframes walkout-left {
+  0% {
+    transform: translateX(-72px) translateY(30px) rotate(-4deg) scale(0.9);
+    opacity: 0;
+    filter: brightness(0.4) saturate(0.6);
+  }
+  55% {
+    opacity: 1;
+  }
+  70% {
+    filter: brightness(1.25) saturate(1.1);
+  }
+  100% {
+    transform: translateX(0) translateY(0) rotate(0) scale(1);
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
+}
+@keyframes walkout-right {
+  0% {
+    transform: translateX(72px) translateY(30px) rotate(4deg) scale(0.9);
+    opacity: 0;
+    filter: brightness(0.4) saturate(0.6);
+  }
+  55% {
+    opacity: 1;
+  }
+  70% {
+    filter: brightness(1.25) saturate(1.1);
+  }
+  100% {
+    transform: translateX(0) translateY(0) rotate(0) scale(1);
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
+}
+
+/* a stat row resolving in the shootout — snaps in with a flash of its winner */
+@keyframes gf-row-resolve {
+  0% {
+    opacity: 0;
+    transform: translateY(7px) scale(0.96);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(0) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* the corner panel (radar, scout notes, chips) sweeps up as the walkouts land */
+@keyframes gf-radar-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* scoreboard digit tick — pops as a goal goes in */
+@keyframes gf-score-tick {
+  0% {
+    transform: translateY(-40%) scale(1.25);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
   }
 }
 
@@ -216,6 +294,32 @@
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* ---- duel fixture plate ---- */
+/* a floodlight sheen that crosses the plate once, then rests — the long tail
+   keeps the sweep rare enough to catch the eye without nagging it */
+@keyframes duel-sweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  9%,
+  100% {
+    transform: translateX(110%);
+  }
+}
+
+/* the kickoff dot on the centre spot, waiting for the whistle */
+@keyframes ball-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.7);
+    opacity: 0.6;
   }
 }
 

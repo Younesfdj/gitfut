@@ -46,20 +46,24 @@ export function shareMessage(card: Card): string {
   return `${shareText(card)}\n\nget scouted →`;
 }
 
-// Per-platform intent URLs. X uses /intent/tweet (NOT /intent/post — the latter
-// loops on mobile). LinkedIn honors only the url; its preview comes from OG tags.
+// X (Twitter) web-intent composer — the single source for the tweet string.
+// Uses /intent/tweet (NOT /intent/post — the latter loops on mobile); carries
+// the prefilled body, the url, and the hashtag.
+const tweetIntent = (text: string, url: string): string =>
+  "https://twitter.com/intent/tweet?text=" +
+  encodeURIComponent(text) +
+  "&url=" +
+  encodeURIComponent(url) +
+  "&hashtags=GitFut";
+
+// Per-platform intent URLs. LinkedIn honors only the url; its preview comes from
+// OG tags.
 export function intentUrl(platform: SharePlatform, card: Card): string {
   const url = cardUrl(card);
   const text = shareMessage(card);
   switch (platform) {
     case "x":
-      return (
-        "https://twitter.com/intent/tweet?text=" +
-        encodeURIComponent(text) +
-        "&url=" +
-        encodeURIComponent(url) +
-        "&hashtags=GitFut"
-      );
+      return tweetIntent(text, url);
     case "linkedin":
       return (
         "https://www.linkedin.com/sharing/share-offsite/?url=" +
@@ -85,4 +89,40 @@ export function nativeSharePayload(card: Card): { title: string; text: string; u
 // Kept for backward-compat with any existing import.
 export function shareUrl(card: Card): string {
   return intentUrl("x", card);
+}
+
+// ---- Duel sharing ----
+// Score-free by design: the fixture poster never spoils the Result, and the
+// default share text protects the same click ("full-time score inside").
+// Sharers who want to brag the score type it themselves.
+
+export function duelUrl(challenger: string, opponent: string): string {
+  return `${SITE}/${challenger}/vs/${opponent}`;
+}
+
+const duelLines = (opponent: string): string[] => [
+  `just dragged @${opponent} onto the pitch. full-time score inside.`,
+  `me vs @${opponent}, settled on github stats. someone got cooked.`,
+  `called out @${opponent} for a duel. the scoreline does the talking.`,
+  `six stats, no VAR. me vs @${opponent} — result inside.`,
+];
+
+export function duelShareMessage(challenger: string, opponent: string): string {
+  const pool = duelLines(opponent);
+  return `${pool[hash(`${challenger}/${opponent}`) % pool.length]}\n\nwatch the duel →`;
+}
+
+export function duelIntentUrl(challenger: string, opponent: string): string {
+  return tweetIntent(duelShareMessage(challenger, opponent), duelUrl(challenger, opponent));
+}
+
+export function duelSharePayload(
+  challenger: string,
+  opponent: string,
+): { title: string; text: string; url: string } {
+  return {
+    title: "GitFut Duel",
+    text: duelShareMessage(challenger, opponent),
+    url: duelUrl(challenger, opponent),
+  };
 }

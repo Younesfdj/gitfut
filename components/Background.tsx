@@ -4,39 +4,35 @@ const NOISE = `url("data:image/svg+xml;utf8,${encodeURIComponent(noiseSvg)}")`;
 
 // Faint GitHub-contribution-grid motif — a brand signature drawn into the
 // backdrop. A few cells gently pulse green (see .gf-grid-cell in globals.css).
-function ContribGrid() {
+//
+// The grid is fully deterministic, so we precompute it ONCE as a static SVG string and inject it via
+// dangerouslySetInnerHTML. This serializes as a single node in the RSC flight instead of 210 separate
+// <rect> flight nodes (each ~90B escaped), shrinking the inline hydration payload — while preserving the
+// exact rects, rounded corners, and per-cell pulse animations (class + --gf-dur inlined into the string).
+const CONTRIB_GRID_SVG = (() => {
   const cols = 30;
   const rows = 7;
-  const cells = [];
+  let rects = "";
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const seed = (r * 7 + c * 13) % 11;
       const lit = seed < 3;
-      cells.push(
-        <rect
-          key={`${r}-${c}`}
-          x={c * 16}
-          y={r * 16}
-          width={12}
-          height={12}
-          rx={2.5}
-          fill={lit ? "#39d353" : "#1b2530"}
-          className={lit ? "gf-grid-cell" : undefined}
-          style={lit ? { ["--gf-dur" as string]: `${2.4 + seed * 0.4}s` } : undefined}
-        />,
-      );
+      const attrs = lit
+        ? ` fill="#39d353" class="gf-grid-cell" style="--gf-dur:${2.4 + seed * 0.4}s"`
+        : ` fill="#1b2530"`;
+      rects += `<rect x="${c * 16}" y="${r * 16}" width="12" height="12" rx="2.5"${attrs}/>`;
     }
   }
+  return `<svg width="${cols * 16}" height="${rows * 16}" viewBox="0 0 ${cols * 16} ${rows * 16}" style="width:100%;height:100%" aria-hidden="true">${rects}</svg>`;
+})();
+
+function ContribGrid() {
   return (
-    <svg
-      width={cols * 16}
-      height={rows * 16}
-      viewBox={`0 0 ${cols * 16} ${rows * 16}`}
-      style={{ width: "100%", height: "100%" }}
+    <div
       aria-hidden
-    >
-      {cells}
-    </svg>
+      style={{ width: "100%", height: "100%" }}
+      dangerouslySetInnerHTML={{ __html: CONTRIB_GRID_SVG }}
+    />
   );
 }
 
@@ -93,9 +89,12 @@ export default function Background() {
           background: "radial-gradient(60% 100% at 50% 100%, rgba(1,4,9,.85), transparent 72%)",
         }}
       />
-      {/* contribution-grid motif, faint along the bottom */}
+      {/* contribution-grid motif, faint along the bottom. Hidden below 980px:
+          narrow layouts stack content much taller than one viewport, so this
+          "floor" strip ends up floating behind mid-page content instead of
+          only at the true bottom. */}
       <div
-        className="absolute bottom-0 left-0 right-0"
+        className="absolute bottom-0 left-0 right-0 max-[980px]:hidden"
         style={{ height: "16%", opacity: 0.5, maskImage: "linear-gradient(to top, #000, transparent)", WebkitMaskImage: "linear-gradient(to top, #000, transparent)" }}
       >
         <ContribGrid />

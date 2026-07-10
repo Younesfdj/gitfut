@@ -217,21 +217,21 @@ function Stagger({ step, children, className }: { step: number; children: React.
 }
 
 // Scouting-dossier header. A left "grade stamp" (the OVR + tier, the scout's
-// verdict-at-a-glance) anchors the row; the identity block sits beside it with
-// the name as hero, one clean meta line, and the verdict inline. No centered
-// stack, no floating pill, no decorative flanking rules.
+// verdict-at-a-glance) anchors the row, top-aligned with the name; the
+// identity block sits beside it. No centered stack, no floating pill, no
+// decorative flanking rules.
 export function ReportHeader({ card }: { card: Card }) {
   const theme = resolveResultTheme(card);
   const accent = theme.ink;
   return (
-    <header className="relative mx-auto flex max-w-[640px] items-center gap-[clamp(16px,3vw,28px)]">
+    <header className="relative mx-auto mt-[10px] flex max-w-[640px] items-start gap-[clamp(16px,3vw,28px)]">
       {/* left — the grade stamp: OVR over tier, the dossier's headline metric */}
       <Stagger step={0} className="shrink-0">
         <div
           className="relative flex h-[clamp(78px,13vw,98px)] w-[clamp(78px,13vw,98px)] flex-col items-center justify-center rounded-2xl border"
           style={{
             borderColor: `${accent}40`,
-            background: `linear-gradient(160deg, ${accent}1a, transparent 70%), #161b22`,
+            background: `linear-gradient(160deg, ${accent}1a, transparent 70%), #0b0930`,
             boxShadow: `0 0 30px ${accent}1f, inset 0 1px 0 ${accent}26`,
           }}
         >
@@ -249,21 +249,14 @@ export function ReportHeader({ card }: { card: Card }) {
 
       {/* right — identity block, left-aligned */}
       <div className="min-w-0 flex-1 text-left">
-        <Stagger step={1}>
-          <div className="flex items-center gap-[8px]">
-            <span className="font-display text-[11px] font-bold tracking-[.3em] text-brand">SCOUT REPORT</span>
-            <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" />
-          </div>
-        </Stagger>
-
-        <Stagger step={2} className="relative">
+        <Stagger step={1} className="relative">
           <div
             aria-hidden
             className="animate-glow pointer-events-none absolute -left-[6%] top-1/2 -z-10 h-[160%] w-[70%] -translate-y-1/2 rounded-full blur-[42px]"
             style={{ background: `radial-gradient(closest-side, ${theme.glow}, transparent 72%)` }}
           />
           <h2
-            className="font-display mt-[2px] truncate text-[clamp(32px,5.4vw,56px)] font-black leading-[.92]"
+            className="font-display truncate text-[clamp(32px,5.4vw,56px)] font-black leading-[.92]"
             style={{
               backgroundImage: `linear-gradient(100deg, #e6edf3 0%, #e6edf3 38%, ${accent} 50%, #fff 54%, #e6edf3 64%, #e6edf3 100%)`,
               backgroundSize: "220% 100%",
@@ -278,17 +271,17 @@ export function ReportHeader({ card }: { card: Card }) {
           </h2>
         </Stagger>
 
-        <Stagger step={3}>
+        <Stagger step={2}>
           <div className="mt-[8px] flex flex-wrap items-center gap-x-[10px] gap-y-[6px]">
             <span
-              className="font-display inline-flex items-center rounded-[6px] border border-brand/40 bg-brand/15 px-[9px] py-[3px] text-[12.5px] font-bold leading-none tracking-[.14em] text-brand"
+              className="font-display inline-flex items-center rounded-[6px] border border-brand/40 bg-brand/15 px-[9px] py-[3px] text-[clamp(11.5px,3vw,12.5px)] font-bold leading-none tracking-[.14em] text-brand"
             >
               {card.position}
             </span>
             {card.founder && (
               <Tip text={card.founder.tagline}>
                 <span
-                  className="font-display inline-flex items-center gap-[5px] rounded-[6px] border px-[9px] py-[3px] text-[12.5px] font-bold leading-none tracking-[.14em]"
+                  className="font-display inline-flex items-center gap-[5px] rounded-[6px] border px-[9px] py-[3px] text-[clamp(11.5px,3vw,12.5px)] font-bold leading-none tracking-[.14em]"
                   style={{
                     color: card.founder.accent,
                     borderColor: rgba(card.founder.accent, 0.45),
@@ -300,20 +293,22 @@ export function ReportHeader({ card }: { card: Card }) {
                 </span>
               </Tip>
             )}
-            <span className="text-[14px] font-medium text-ink-dim">{card.archetype}</span>
-            <span aria-hidden className="h-[11px] w-px bg-white/15" />
-            <a
-              href={`https://github.com/${card.login}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono text-[13px] text-ink-faint underline-offset-2 transition hover:text-brand hover:underline"
-            >
-              @{card.login}
-            </a>
-            {card.topLanguage && (
-              <>
-                <span aria-hidden className="h-[11px] w-px bg-white/15" />
-                <span className="inline-flex items-center gap-[6px] text-[13px] text-ink-dim">
+            <span className="text-[clamp(12.5px,3.4vw,14px)] font-medium text-ink-dim">{card.archetype}</span>
+            {/* @login + language travel together as one flex item so they wrap to
+                a new line as a unit — keeps a divider from ever landing orphaned
+                at a line break. */}
+            <span className="inline-flex flex-wrap items-center gap-x-[10px] gap-y-[6px]">
+              <a
+                href={`https://github.com/${card.login}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-[clamp(11.5px,3vw,13px)] text-ink-faint underline-offset-2 transition hover:text-brand hover:underline"
+              >
+                @{card.login}
+              </a>
+              {card.topLanguage && (
+                <span className="inline-flex items-center gap-[6px] text-[clamp(11.5px,3vw,13px)] text-ink-dim">
+                  <span aria-hidden className="h-[11px] w-px bg-white/15" />
                   {card.languageLogo && (
                     <img
                       src={languageLogoUrl(card.languageLogo.slug)}
@@ -325,14 +320,18 @@ export function ReportHeader({ card }: { card: Card }) {
                   )}
                   {card.topLanguage}
                 </span>
-              </>
-            )}
+              )}
+            </span>
           </div>
         </Stagger>
 
-        {/* verdict inline: label + grade, then the blurb continues the sentence */}
-        <Stagger step={4}>
-          <p className="mt-[9px] line-clamp-2 text-[13.5px] leading-[1.5] text-ink-soft">
+        {/* verdict inline: label + grade, then the blurb continues the sentence.
+            line-clamp-3 (not reserved height — only clips when actually needed)
+            so narrow phones get a 3rd line instead of cutting the sentence off
+            mid-word; blurbs are short enough to still land in 1-2 lines everywhere
+            else. Fluid text size fits more per line before the clamp kicks in. */}
+        <Stagger step={3}>
+          <p className="mt-[9px] line-clamp-3 text-[clamp(12.5px,3.2vw,13.5px)] leading-[1.5] text-ink-soft">
             <span className="font-display mr-[7px] text-[11px] font-bold tracking-[.18em]" style={{ color: accent }}>
               {VERDICTS[card.finish].toUpperCase()}
             </span>
