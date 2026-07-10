@@ -40,7 +40,7 @@ export interface RawPayload {
   createdAt: string;
   followers: number;
   publicRepos: number;
-  repos: RawRepo[]; // owned, non-fork, top 100 by stars
+  repos: RawRepo[]; // owned, non-fork, top REPO_PAGE_SIZE * REPO_MAX_PAGES by stars (see fetchRepoPages)
   recentCommits: number; // the "recent" fields cover the last 365 days
   recentPRs: number;
   recentReviews: number;
@@ -59,6 +59,14 @@ const ENDPOINT = "https://api.github.com/graphql";
 const VALID = /^(?=.*[a-z\d])[a-z\d-]{1,39}$/i;
 const GITHUB_EPOCH_YEAR = 2008; // GitHub launched Feb 2008; no account predates it.
 const LIFETIME_BATCH = 4; // contribution windows per request — stays well under GitHub's timeout.
+const REPO_PAGE_SIZE = 100; // GraphQL's max page size.
+// Extra pages beyond the first, fetched only when the profile has more than
+// REPO_PAGE_SIZE owned repos. Capped (not "fetch everything") for the same
+// reason lifetime contributions are batched: an unbounded loop over a 1,000+
+// repo account risks the resolver timeout. 3 total pages (300 repos) covers
+// the overwhelming majority of profiles while staying cheap for the common
+// case (accounts under 100 repos do zero extra requests).
+const REPO_MAX_PAGES = 3;
 // Abort a GitHub request that hangs at the socket level, instead of letting it
 // hang the whole scout (and, under load, starve other requests). Kept BELOW
 // Vercel's ~10s serverless function cap: at 8s we still get to return a clean
@@ -81,6 +89,7 @@ interface UserNode {
   followers: { totalCount: number };
   repositories: {
     totalCount: number;
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
     nodes: {
       stargazerCount: number;
       primaryLanguage: { name: string } | null;
@@ -96,6 +105,13 @@ interface UserNode {
     restrictedContributionsCount: number; // private contributions, when the user shows them
     contributionCalendar: { weeks: { contributionDays: { contributionCount: number }[] }[] };
   };
+}
+
+type RepoNode = UserNode["repositories"]["nodes"][number];
+
+interface RepoPage {
+  pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  nodes: RepoNode[];
 }
 
 interface YearContrib {
@@ -182,8 +198,9 @@ function profileQuery(): string {
         location
         createdAt
         followers { totalCount }
-        repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
+        repositories(ownerAffiliations: OWNER, isFork: false, first: ${REPO_PAGE_SIZE}, orderBy: { field: STARGAZERS, direction: DESC }) {
           totalCount
+          pageInfo { hasNextPage endCursor }
           nodes { stargazerCount primaryLanguage { name } createdAt pushedAt }
         }
         recent: contributionsCollection {
@@ -196,6 +213,45 @@ function profileQuery(): string {
         }
       }
     }`;
+}
+
+function repoPageQuery(cursor: string): string {
+  return `
+    query RepoPage($login: String!) {
+      user(login: $login) {
+        repositories(
+          ownerAffiliations: OWNER
+          isFork: false
+          first: ${REPO_PAGE_SIZE}
+          after: "${cursor}"
+          orderBy: { field: STARGAZERS, direction: DESC }
+        ) {
+          pageInfo { hasNextPage endCursor }
+          nodes { stargazerCount primaryLanguage { name } createdAt pushedAt }
+        }
+      }
+    }`;
+}
+
+// Follows the first repo page up to REPO_MAX_PAGES total, for profiles with
+// more owned repos than fit on one page. Best-effort like fetchLifetime: a
+// failed extra page just means fewer (still-real) repos counted, not a
+// failed scout — the profile query already succeeded.
+async function fetchExtraRepoPages(login: string, tok: PoolToken, startCursor: string): Promise<RepoNode[]> {
+  const extra: RepoNode[] = [];
+  let cursor = startCursor;
+  for (let page = 1; page < REPO_MAX_PAGES; page++) {
+    try {
+      const { user } = await gql<{ repositories: RepoPage }>(repoPageQuery(cursor), login, tok);
+      if (!user) break;
+      extra.push(...user.repositories.nodes);
+      if (!user.repositories.pageInfo.hasNextPage || !user.repositories.pageInfo.endCursor) break;
+      cursor = user.repositories.pageInfo.endCursor;
+    } catch {
+      break;
+    }
+  }
+  return extra;
 }
 
 function lifetimeQuery(years: number[], currentYear: number, nowIso: string): string {
@@ -286,13 +342,20 @@ export async function fetchProfile(username: string, now = new Date()): Promise<
   if (!user) return fail("notfound", "No GitHub user by that name.");
 
   const createdYear = new Date(user.createdAt).getUTCFullYear();
-  const lifetimeContributions = await fetchLifetime(login, tok, createdYear, now.getUTCFullYear(), now.toISOString());
+  const extraReposPromise =
+    user.repositories.pageInfo?.hasNextPage && user.repositories.pageInfo.endCursor
+      ? fetchExtraRepoPages(login, tok, user.repositories.pageInfo.endCursor)
+      : Promise.resolve<RepoNode[]>([]);
+  const [lifetimeContributions, extraRepos] = await Promise.all([
+    fetchLifetime(login, tok, createdYear, now.getUTCFullYear(), now.toISOString()),
+    extraReposPromise,
+  ]);
 
-  return normalize(user, lifetimeContributions);
+  return normalize(user, lifetimeContributions, extraRepos);
 }
 
-function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
-  const repos: RawRepo[] = user.repositories.nodes.map((n) => ({
+function normalize(user: UserNode, lifetimeContributions: number, extraRepos: RepoNode[] = []): RawPayload {
+  const repos: RawRepo[] = [...user.repositories.nodes, ...extraRepos].map((n) => ({
     stars: n.stargazerCount ?? 0,
     language: n.primaryLanguage?.name ?? null,
     createdAt: n.createdAt,

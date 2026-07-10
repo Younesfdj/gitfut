@@ -34,7 +34,7 @@ const USER = {
   location: null,
   createdAt: "2023-02-01T00:00:00Z",
   followers: { totalCount: 1 },
-  repositories: { totalCount: 0, nodes: [] },
+  repositories: { totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
   recent: {
     totalCommitContributions: 1,
     totalPullRequestContributions: 0,
@@ -189,6 +189,59 @@ describe("fetchProfile username validation", () => {
       await expect(fetchProfile(bad, NOW)).rejects.toMatchObject({ type: "invalid" });
     }
     expect(mock).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchProfile repo pagination", () => {
+  const repoNode = (stars: number) => ({
+    stargazerCount: stars,
+    primaryLanguage: { name: "TypeScript" },
+    createdAt: "2023-02-01T00:00:00Z",
+    pushedAt: "2023-02-01T00:00:00Z",
+  });
+
+  const PAGE1_USER = {
+    ...USER,
+    repositories: {
+      totalCount: 150,
+      pageInfo: { hasNextPage: true, endCursor: "cursor1" },
+      nodes: [repoNode(100)],
+    },
+  };
+
+  it("follows an extra page and merges its repos onto the first page's", async () => {
+    scriptFetch((_t, body) => {
+      if (body.includes("query Profile")) return ok({ data: { user: PAGE1_USER } });
+      if (body.includes("query RepoPage")) {
+        return ok({
+          data: {
+            user: {
+              repositories: {
+                pageInfo: { hasNextPage: false, endCursor: null },
+                nodes: [repoNode(50)],
+              },
+            },
+          },
+        });
+      }
+      return ok({ data: { user: {} } }); // lifetime
+    });
+
+    const profile = await fetchProfile(LOGIN, NOW);
+    expect(profile.repos.map((r) => r.stars).sort((a, b) => a - b)).toEqual([50, 100]);
+    const repoPageCall = calls.find((c) => c.body.includes("query RepoPage"));
+    expect(repoPageCall?.body).toContain("cursor1");
+  });
+
+  it("degrades to just the first page when the extra page fails (best-effort, scout still succeeds)", async () => {
+    scriptFetch((_t, body) => {
+      if (body.includes("query Profile")) return ok({ data: { user: PAGE1_USER } });
+      if (body.includes("query RepoPage")) return rateLimited();
+      return ok({ data: { user: {} } }); // lifetime
+    });
+
+    const profile = await fetchProfile(LOGIN, NOW);
+    expect(profile.repos.map((r) => r.stars)).toEqual([100]);
   });
 });
 
