@@ -102,5 +102,6 @@ export interface Card {
   // Set only for gitfut founders — their bespoke card art/accent + hint metadata.
   // Optional so every other card (and previously serialized ones) stay valid.
   founder?: FounderMeta;
+  squadNumber: number; //Squad nnumber generated from login and position
   report: Report;
 }
