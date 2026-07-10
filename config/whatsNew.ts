@@ -1,5 +1,3 @@
-import VsBurst from "../components/VsBurst";
-
 export type WhatsNewItem = {
   /** Unique, stable slug — forms the "already seen" key in sessionStorage. */
   id: string;
@@ -9,16 +7,20 @@ export type WhatsNewItem = {
   body: string;
   /** Flip to false to retire the item without deleting it. */
   show: boolean;
-  /** Optional icon name to show in the header. */
-  icon?: React.ComponentType<{ size: number }>;
 };
 
+// ── HOW TO ANNOUNCE SOMETHING NEW ────────────────────────────────────────
+// 1. Add an object to the TOP of WHATS_NEW with a fresh, unique `id`.
+// 2. Set `show: true`. Newest first — the modal renders them in array order.
+// 3. Shipping a new id makes the bulletin reappear for everyone, even mid-
+//    session (the id isn't in their "seen" set yet). Retire an item with
+//    `show: false` — it won't retrigger. All items off → nothing renders.
+// ─────────────────────────────────────────────────────────────────────────
 export const WHATS_NEW: WhatsNewItem[] = [
   {
     id: "duels",
     title: "DUEL A RIVAL",
-    body: "Take your card head-to-head against any dev. six stats, one winner",
+    body: "Take your card head-to-head against any dev. Six stats, one winner. The gold VS plate is on your card page.",
     show: true,
-    icon: VsBurst,
   },
 ];

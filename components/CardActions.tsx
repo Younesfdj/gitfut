@@ -331,7 +331,7 @@ export default function CardActions({
             disabled={!!busy}
             title="Download your card as an image"
             aria-label="Download your card as an image"
-            className="group flex h-[46px] min-w-0 flex-1 items-center justify-center gap-[8px] rounded-l-xl border border-r-0 text-[13.5px] font-bold tracking-[.02em] transition-all duration-200 ease-out disabled:opacity-70"
+            className={`group flex h-[46px] min-w-0 flex-1 items-center justify-center gap-[8px] rounded-tl-xl border border-r-0 text-[13.5px] font-bold tracking-[.02em] transition-all duration-200 ease-out disabled:opacity-70 ${menuOpen ? "" : "rounded-bl-xl"}`}
             {...splitHalf}
           >
             {busy ? (
@@ -362,7 +362,7 @@ export default function CardActions({
             aria-label="More export options"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            className="flex h-[46px] w-[34px] shrink-0 items-center justify-center rounded-r-xl border transition-all duration-200 ease-out disabled:opacity-70"
+            className={`flex h-[46px] w-[34px] shrink-0 items-center justify-center rounded-tr-xl border transition-all duration-200 ease-out disabled:opacity-70 ${menuOpen ? "" : "rounded-br-xl"}`}
             {...splitHalf}
           >
             <ChevronDown
@@ -377,8 +377,12 @@ export default function CardActions({
               role="menu"
               aria-label="Export options"
               onKeyDown={onMenuKeyDown}
-              className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[180px] overflow-hidden rounded-xl border border-line bg-surface p-[4px] shadow-[0_14px_36px_-10px_rgba(0,0,0,.8)]"
-              style={{ animation: "pop .16s cubic-bezier(.16,1,.3,1) both" }}
+              className="absolute inset-x-0 top-full z-20 overflow-hidden rounded-b-xl border border-t-0 bg-bg-deep p-[4px] shadow-[0_14px_36px_-10px_rgba(0,0,0,.8)]"
+              style={{
+                borderColor: `${tier}66`,
+                backgroundImage: `linear-gradient(${tier}1f, ${tier}1f)`,
+                animation: "pop .16s cubic-bezier(.16,1,.3,1) both",
+              }}
             >
               {/* literal items (no render-built handler array): the compiler
                   only trusts ref-reading closures in onClick position */}

@@ -11,6 +11,7 @@ import FlagPicker from "./FlagPicker";
 import Mascot from "./Mascot";
 import FooterCredit from "./FooterCredit";
 import BuyMeACoffee from "./BuyMeACoffee";
+import SupportProductHunt from "./SupportProductHunt";
 import GithubStar from "./GithubStar";
 import dynamic from "next/dynamic";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
@@ -141,7 +142,7 @@ export default function ResultView({
         </div>
 
         {/* center — the card + actions (the walkout happens here) */}
-        <div className="relative flex flex-col items-center gap-[clamp(12px,2vh,18px)] max-[980px]:order-1">
+        <div className="relative flex flex-col items-center gap-[clamp(12px,2vh,18px)] max-[980px]:order-1 mb-14">
           {/* spotlight wash — a soft, diffuse glow from above as the card rises.
               Reduced + blurred so it reads as ambient light, not a hard beam. */}
           <div
@@ -157,9 +158,8 @@ export default function ResultView({
               downloaded/copied PNG never includes the picker UI. */}
           <div className="animate-walkout relative" style={{ width: CARD_WIDTH }}>
             <div ref={captureRef} className="relative">
-              {/* tier glow that ignites on reveal */}
               <div
-                className="animate-glow pointer-events-none absolute -inset-[12%] z-0 rounded-full blur-[20px]"
+                className="animate-glow pointer-events-none absolute -inset-[12%] z-0 rounded-full"
                 style={{
                   background: `radial-gradient(closest-side, ${theme.glow}, transparent 72%)`,
                   opacity: ignited ? 1 : 0,
@@ -217,6 +217,7 @@ export default function ResultView({
       </div>
     </main>
 
+    <SupportProductHunt />
     <BuyMeACoffee />
 
     {modalOpen && <HowItWorksModal onClose={() => setModalOpen(false)} />}
