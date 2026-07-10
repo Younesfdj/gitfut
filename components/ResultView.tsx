@@ -15,6 +15,7 @@ import SupportProductHunt from "./SupportProductHunt";
 import GithubStar from "./GithubStar";
 import dynamic from "next/dynamic";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
+import DistributionPanel from "./DistributionPanel";
 import { confettiPalette, resolveResultTheme } from "./finishTheme";
 import { useReveal } from "@/hooks/useReveal";
 import { burstConfetti } from "@/lib/confetti";
@@ -159,9 +160,8 @@ export default function ResultView({
               downloaded/copied PNG never includes the picker UI. */}
           <div className="animate-walkout relative" style={{ width: CARD_WIDTH }}>
             <div ref={captureRef} className="relative">
-              {/* tier glow that ignites on reveal */}
               <div
-                className="animate-glow pointer-events-none absolute -inset-[12%] z-0 rounded-full blur-[20px]"
+                className="animate-glow pointer-events-none absolute -inset-[12%] z-0 rounded-full"
                 style={{
                   background: `radial-gradient(closest-side, ${theme.glow}, transparent 72%)`,
                   opacity: ignited ? 1 : 0,
@@ -185,10 +185,11 @@ export default function ResultView({
           </div>
         </div>
 
-        {/* right — scouting metrics + squad number */}
+        {/* right — scouting metrics + squad number + distribution */}
         <div className="flex max-[980px]:order-3 max-[980px]:w-full max-[980px]:max-w-[420px] max-[980px]:justify-center">
-          <div className="w-full max-w-[360px]">
+          <div className="flex w-full max-w-[360px] flex-col gap-[14px]">
             <MetricsPanel card={card} />
+            <DistributionPanel card={card} />
             <PlayerNumber card={card} />
           </div>
         </div>
