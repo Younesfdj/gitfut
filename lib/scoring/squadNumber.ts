@@ -19,6 +19,8 @@ export function generateSquadNumber(login: string, position: Position): number {
         CB: [4, 5, 2, 3, 6, 12, 15, 26, 33],
     };
 
+    const pool = posNumbers[position]||[7, 9, 10, 11];
 
-    return hash;
+
+    return pool[hash % pool.length];
 }
