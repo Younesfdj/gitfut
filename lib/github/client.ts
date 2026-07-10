@@ -40,7 +40,7 @@ export interface RawPayload {
   createdAt: string;
   followers: number;
   publicRepos: number;
-  repos: RawRepo[]; // owned, non-fork, top 100 by stars
+  repos: RawRepo[]; // owned + org-created, non-fork, top 100 by stars
   recentCommits: number; // the "recent" fields cover the last 365 days
   recentPRs: number;
   recentReviews: number;
@@ -58,6 +58,7 @@ const ENDPOINT = "https://api.github.com/graphql";
 // existence; this only screens out impossible input (spaces, symbols, over-length).
 const VALID = /^(?=.*[a-z\d])[a-z\d-]{1,39}$/i;
 const GITHUB_EPOCH_YEAR = 2008; // GitHub launched Feb 2008; no account predates it.
+const ORG_REPO_BATCH = 8; // contribution windows per request — stays well under GitHub's timeout.
 const LIFETIME_BATCH = 4; // contribution windows per request — stays well under GitHub's timeout.
 // Abort a GitHub request that hangs at the socket level, instead of letting it
 // hang the whole scout (and, under load, starve other requests). Kept BELOW
@@ -88,6 +89,19 @@ interface UserNode {
       pushedAt: string;
     }[];
   };
+  organizations: {
+    nodes: {
+      repositories: {
+        nodes: {
+          nameWithOwner: string;
+          stargazerCount: number;
+          primaryLanguage: { name: string } | null;
+          createdAt: string;
+          pushedAt: string;
+        }[];
+      };
+    }[];
+  };
   recent: {
     totalCommitContributions: number;
     totalPullRequestContributions: number;
@@ -104,6 +118,14 @@ interface YearContrib {
   totalPullRequestContributions: number;
   totalPullRequestReviewContributions: number;
   restrictedContributionsCount: number;
+}
+
+interface OrgRepoNode {
+    nameWithOwner: string;
+    stargazerCount: number;
+    primaryLanguage: { name: string; } | null;
+    createdAt: string;
+    pushedAt: string;
 }
 
 // POSTs a query, retrying transient failures. Terminal failures (bad token,
@@ -172,6 +194,44 @@ async function gql<T>(query: string, login: string, tok: PoolToken, retries = 1)
   return fail("network", "GitHub request failed."); // unreachable; satisfies the type checker
 }
 
+// Like gql but returns the full data payload without assuming a `user` root.
+// Used for queries that don't follow the `query($login) { user(...) { ... } }` shape.
+async function gqlRaw<T>(query: string, tok: PoolToken, retries = 1): Promise<T | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    let res: Response;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tok.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+        signal: ctrl.signal,
+      });
+    } catch {
+      if (attempt < retries) { await delay(); continue; }
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    recordTokenHealth(tok.idx, res.headers);
+    if (res.status === 401 || res.status === 403 || res.status === 429) return null;
+    if (res.status >= 500) { if (attempt < retries) { await delay(); continue; } return null; }
+    if (!res.ok) return null;
+
+    try {
+      const body: { data?: T; errors?: { type?: string }[] } = await res.json();
+      if (body.errors?.some((e) => e.type === "RATE_LIMITED" || e.type === "RATE_LIMIT")) return null;
+      return body.data ?? null;
+    } catch {
+      if (attempt < retries) { await delay(); continue; }
+      return null;
+    }
+  }
+  return null;
+}
+
 function profileQuery(): string {
   return `
     query Profile($login: String!) {
@@ -186,6 +246,16 @@ function profileQuery(): string {
           totalCount
           nodes { stargazerCount primaryLanguage { name } createdAt pushedAt }
         }
+        organizations(first: 20) {
+          nodes {
+            repositories(isFork: false, first: 10, orderBy: { field: STARGAZERS, direction: DESC }) {
+              nodes {
+                nameWithOwner
+                stargazerCount primaryLanguage { name } createdAt pushedAt
+              }
+            }
+          }
+        }
         recent: contributionsCollection {
           totalCommitContributions
           totalPullRequestContributions
@@ -195,6 +265,22 @@ function profileQuery(): string {
           contributionCalendar { weeks { contributionDays { contributionCount } } }
         }
       }
+    }`;
+}
+
+function repositoryAuthorQuery(repos: OrgRepoNode[]): string {
+  const authors = repos
+    .map((r, i) => {
+      const [owner, name] = r.nameWithOwner.split("/");
+      const d = new Date(r.createdAt);
+      d.setUTCDate(d.getUTCDate() + 1);
+      d.setUTCHours(0, 0, 0, 0);
+      return `        r${i}: repository(owner: "${owner}", name: "${name}") { defaultBranchRef { target { ... on Commit { history(first: 1, until: "${d.toISOString()}") { nodes { author { user { login } } } } } } } }`;
+    })
+    .join("\n");
+  return `
+    query {
+${authors}
     }`;
 }
 
@@ -217,6 +303,33 @@ function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
+}
+
+async function resolveOrgRepoCreators(
+  repos: OrgRepoNode[],
+  login: string,
+  tok: PoolToken,
+): Promise<Set<string>> {
+  const created = new Set<string>();
+  if (!repos.length) return created;
+
+  await Promise.all(
+    chunk(repos, ORG_REPO_BATCH).map(async (batch) => {
+      try {
+        const data = await gqlRaw<{
+          [alias: string]: { defaultBranchRef: { target: { history: { nodes: { author: { user: { login: string } | null } }[] } } } | null } | null;
+        }>(repositoryAuthorQuery(batch), tok);
+        if (!data) return;
+        batch.forEach((r, i) => {
+          const author = data[`r${i}`]?.defaultBranchRef?.target?.history?.nodes[0]?.author?.user?.login;
+          if (author === login) created.add(r.nameWithOwner);
+        });
+      } catch {
+        // Best-effort: a failed batch just means those repos won't be credited.
+      }
+    }),
+  );
+  return created;
 }
 
 // Sum of every year's contributions (commits + issues + PRs + reviews + private).
@@ -285,19 +398,33 @@ export async function fetchProfile(username: string, now = new Date()): Promise<
   }
   if (!user) return fail("notfound", "No GitHub user by that name.");
 
-  const createdYear = new Date(user.createdAt).getUTCFullYear();
-  const lifetimeContributions = await fetchLifetime(login, tok, createdYear, now.getUTCFullYear(), now.toISOString());
+  const allOrgRepos = (user.organizations?.nodes ?? []).flatMap((org) => org.repositories.nodes);
+  const [lifetimeContributions, orgCreated] = await Promise.all([
+    fetchLifetime(login, tok, new Date(user.createdAt).getUTCFullYear(), now.getUTCFullYear(), now.toISOString()),
+    resolveOrgRepoCreators(allOrgRepos, login, tok),
+  ]);
 
-  return normalize(user, lifetimeContributions);
+  return normalize(user, lifetimeContributions, orgCreated);
 }
 
-function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
-  const repos: RawRepo[] = user.repositories.nodes.map((n) => ({
+function normalize(user: UserNode, lifetimeContributions: number, orgCreated: Set<string>): RawPayload {
+  const ownedRepos: RawRepo[] = user.repositories.nodes.map((n) => ({
     stars: n.stargazerCount ?? 0,
     language: n.primaryLanguage?.name ?? null,
     createdAt: n.createdAt,
     pushedAt: n.pushedAt,
   }));
+
+  const organizationRepos: RawRepo[] = user.organizations.nodes.flatMap((org) =>
+    org.repositories.nodes
+      .filter((r) => orgCreated.has(r.nameWithOwner))
+      .map((n) => ({
+        stars: n.stargazerCount ?? 0,
+        language: n.primaryLanguage?.name ?? null,
+        createdAt: n.createdAt,
+        pushedAt: n.pushedAt,
+      })),
+  );
 
   const recentActiveDays = user.recent.contributionCalendar.weeks.reduce(
     (days, w) => days + w.contributionDays.filter((d) => d.contributionCount > 0).length,
@@ -312,7 +439,7 @@ function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
     createdAt: user.createdAt,
     followers: user.followers.totalCount,
     publicRepos: user.repositories.totalCount,
-    repos,
+    repos: [...ownedRepos, ...organizationRepos],
     recentCommits: user.recent.totalCommitContributions,
     recentPRs: user.recent.totalPullRequestContributions,
     recentReviews: user.recent.totalPullRequestReviewContributions,
