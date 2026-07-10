@@ -122,9 +122,60 @@ function normalize(s: string): string {
  */
 const POSITION_CODE_COLLISIONS = new Set(["st", "rw", "cam", "cm", "cdm", "cb"]);
 
+/**
+ * ISO codes that are also common English words. Matching them as bare tokens
+ * mis-parses queries like "top strikers in USA" → India (`in`).
+ * Full names ("India", "Norway", …) and explicit aliases still work.
+ */
+const ENGLISH_WORD_CODE_COLLISIONS = new Set([
+  "in", // India - preposition "in"
+  "me", // Montenegro
+  "to", // Tonga
+  "no", // Norway
+  "is", // Iceland
+  "as", // American Samoa
+  "be", // Belgium
+  "do", // Dominican Republic
+  "so", // Somalia
+  "by", // Belarus
+  "at", // Austria
+  "on", // (reserved / easy false positive)
+  "am", // Armenia
+  "my", // Malaysia
+  "id", // Indonesia
+]);
+
+/** Common nicknames / abbreviations → ISO flag codes. */
+const COUNTRY_ALIASES: Record<string, string> = {
+  usa: "us",
+  america: "us",
+  "united states of america": "us",
+  "u.s.": "us",
+  "u.s.a.": "us",
+  "u.s": "us",
+  "u.s.a": "us",
+  uk: "gb",
+  britain: "gb",
+  "great britain": "gb",
+  england: "eng",
+  scotland: "sct",
+  wales: "wls",
+  "south africa": "za", // also a COUNTRIES name; alias keeps order stable
+};
+
+function isBlockedBareCode(tok: string): boolean {
+  return POSITION_CODE_COLLISIONS.has(tok) || ENGLISH_WORD_CODE_COLLISIONS.has(tok);
+}
+
 /** Resolve a country name or code from free text; returns ISO-ish flag code. */
 export function extractCountry(query: string): string | null {
   const q = normalize(query);
+
+  // 0) Explicit aliases first (USA, UK, America, …).
+  const aliasKeys = Object.keys(COUNTRY_ALIASES).sort((a, b) => b.length - a.length);
+  for (const key of aliasKeys) {
+    if (q.includes(key)) return COUNTRY_ALIASES[key]!;
+  }
 
   // 1) Full country names only (longest first so "South Africa" beats "Africa").
   // Do NOT match bare ISO codes here - `st` in "top ST from …" is a position.
@@ -134,21 +185,24 @@ export function extractCountry(query: string): string | null {
     if (name && q.includes(name)) return c.code;
   }
 
-  // 2) Explicit "from/in <code>" for non-colliding codes (e.g. "from bw").
-  const fromCode = q.match(/\b(?:from|in|of)\s+([a-z]{2,3})\b/);
+  // 2) Explicit "from/of <code>" (and "in <code>" only when code isn't an EN word).
+  // Prefer "from"/"of" so "strikers in USA" does not bind the preposition "in" as India.
+  const fromCode = q.match(/\b(?:from|of)\s+([a-z]{2,3})\b/);
   if (fromCode) {
     const tok = fromCode[1]!;
-    if (!POSITION_CODE_COLLISIONS.has(tok)) {
+    if (!POSITION_CODE_COLLISIONS.has(tok) && !ENGLISH_WORD_CODE_COLLISIONS.has(tok)) {
       const hit = COUNTRIES.find((c) => c.code === tok);
       if (hit) return hit.code;
     }
+    // "from us" is United States (us is not in ENGLISH_WORD_CODE_COLLISIONS).
   }
 
-  // 3) Bare code token only when it isn't also a position abbreviation.
+  // 3) Bare code token only when it isn't a position abbr or English word.
   const codeHit = q.match(/\b([a-z]{2,3})\b/g);
   if (codeHit) {
     for (const tok of codeHit) {
-      if (POSITION_CODE_COLLISIONS.has(tok)) continue;
+      if (isBlockedBareCode(tok)) continue;
+      // Bare "us" is allowed (United States); blocked list excludes it intentionally.
       const hit = COUNTRIES.find((c) => c.code === tok);
       if (hit) return hit.code;
     }

@@ -71,6 +71,20 @@ describe("extract", () => {
     expect(extractCountry("Top CB from Nigeria")).toBe("ng");
   });
 
+  it("maps USA / US / America to us, not India", () => {
+    expect(extractCountry("Top strikers from USA")).toBe("us");
+    expect(extractCountry("Top strikers from US")).toBe("us");
+    expect(extractCountry("Top strikers from America")).toBe("us");
+    expect(extractCountry("Top strikers in USA")).toBe("us");
+    expect(extractCountry("Who are the top strikers in the USA?")).toBe("us");
+    // Preposition "in" must never become India
+    expect(extractCountry("Top strikers in Botswana")).toBe("bw");
+  });
+
+  it("still extracts India by name", () => {
+    expect(extractCountry("Top strikers from India")).toBe("in");
+  });
+
   it("extracts South Africa", () => {
     expect(extractCountry("Best centre-backs from South Africa")).toBe("za");
   });
