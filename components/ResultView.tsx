@@ -157,9 +157,8 @@ export default function ResultView({
               downloaded/copied PNG never includes the picker UI. */}
           <div className="animate-walkout relative" style={{ width: CARD_WIDTH }}>
             <div ref={captureRef} className="relative">
-              {/* tier glow that ignites on reveal */}
               <div
-                className="animate-glow pointer-events-none absolute -inset-[12%] z-0 rounded-full blur-[20px]"
+                className="animate-glow pointer-events-none absolute -inset-[12%] z-0 rounded-full"
                 style={{
                   background: `radial-gradient(closest-side, ${theme.glow}, transparent 72%)`,
                   opacity: ignited ? 1 : 0,
