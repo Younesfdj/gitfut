@@ -10,6 +10,7 @@ const SPREAD_OPEN = 124;
 /** Cards visible per page in the fan (swipe for more). */
 export const FAN_PAGE_SIZE = 4;
 const SWIPE_THRESHOLD = 56;
+const AXIS_LOCK_PX = 8;
 
 interface Props {
   cards: Card[];
@@ -39,6 +40,9 @@ export default function CardFan({ cards, onPick, paginate = true }: Props) {
   const didSwipe = useRef(false);
   const pageRef = useRef(0);
   const dragXRef = useRef(0);
+  /** True between pointerdown and pointerup; capture only after horizontal intent. */
+  const pending = useRef(false);
+  const captured = useRef(false);
 
   const pageCount = paginate ? Math.max(1, Math.ceil(cards.length / FAN_PAGE_SIZE)) : 1;
   const safePage = Math.min(page, pageCount - 1);
@@ -63,19 +67,34 @@ export default function CardFan({ cards, onPick, paginate = true }: Props) {
     startY.current = e.clientY;
     axis.current = "none";
     didSwipe.current = false;
-    setDragging(true);
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    pending.current = true;
+    captured.current = false;
+    dragXRef.current = 0;
+    // Do NOT setPointerCapture here - that retargets click away from the card
+    // and breaks Scout navigation on Ask results. Capture only after a swipe.
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging || !canPage) return;
+    if (!pending.current || !canPage) return;
     const dx = e.clientX - startX.current;
     const dy = e.clientY - startY.current;
     if (axis.current === "none") {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return;
       axis.current = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+      if (axis.current === "y") {
+        // Vertical scroll intent - abandon swipe so the page can scroll.
+        pending.current = false;
+        return;
+      }
     }
     if (axis.current !== "x") return;
+
+    if (!captured.current) {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      captured.current = true;
+      setDragging(true);
+    }
+
     e.preventDefault();
     // Rubber-band at edges.
     const atStart = pageRef.current === 0 && dx > 0;
@@ -85,17 +104,27 @@ export default function CardFan({ cards, onPick, paginate = true }: Props) {
     setDragX(next);
   };
 
-  const endDrag = () => {
-    if (!dragging) return;
-    setDragging(false);
+  const endDrag = (e?: React.PointerEvent) => {
+    if (!pending.current && !dragging) return;
+    pending.current = false;
     const dx = dragXRef.current;
-    if (axis.current === "x" && Math.abs(dx) >= SWIPE_THRESHOLD) {
+    const swiped = captured.current && axis.current === "x" && Math.abs(dx) >= SWIPE_THRESHOLD;
+    if (swiped) {
       didSwipe.current = true;
       // Drag left (negative) -> next page; drag right -> previous.
       goTo(pageRef.current + (dx < 0 ? 1 : -1));
     }
+    if (captured.current && e?.currentTarget instanceof HTMLElement) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        /* already released */
+      }
+    }
+    captured.current = false;
     dragXRef.current = 0;
     setDragX(0);
+    setDragging(false);
     axis.current = "none";
   };
 
