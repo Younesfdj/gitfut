@@ -1,6 +1,6 @@
 import type { Position } from "./types";
 
-export function generateSquadNumber(login: string, position: Position): number {
+export function generateSquadNumber(login: string, position: Position, overall: number): number {
     //Create a hash from the username
     let hash = 0;
     for (let i = 0; i < login.length; i++) {
@@ -21,6 +21,11 @@ export function generateSquadNumber(login: string, position: Position): number {
 
     const pool = posNumbers[position]||[7, 9, 10, 11];
 
-
+    //Elite players (90+ OVR) always get the classic #1 choice for their position
+    if(overall >= 90){
+        return pool[0];
+    }
+    
+    //Else use the hash to pick a varied, but consistent number
     return pool[hash % pool.length];
 }

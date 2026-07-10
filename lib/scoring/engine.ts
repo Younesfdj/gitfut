@@ -214,7 +214,7 @@ export function buildCard(s: Signals): Card {
     languageLogo,
     ...(founder ? { founder } : null),
     legacy: { L },
-    squadNumber: generateSquadNumber(s.login, position),
+    squadNumber: generateSquadNumber(s.login, position, overall),
     report: {
       skillMoves: skill.value,
       weakFoot: weak.value,
