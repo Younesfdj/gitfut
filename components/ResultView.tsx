@@ -18,6 +18,8 @@ import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
 import { confettiPalette, resolveResultTheme } from "./finishTheme";
 import { useReveal } from "@/hooks/useReveal";
 import { burstConfetti } from "@/lib/confetti";
+import PlayerNumber from "./PlayerNumber";
+
 
 const HowItWorksModal = dynamic(() => import("./HowItWorksModal"), { ssr: false });
 
@@ -183,10 +185,11 @@ export default function ResultView({
           </div>
         </div>
 
-        {/* right — scouting metrics */}
+        {/* right — scouting metrics + squad number */}
         <div className="flex max-[980px]:order-3 max-[980px]:w-full max-[980px]:max-w-[420px] max-[980px]:justify-center">
           <div className="w-full max-w-[360px]">
             <MetricsPanel card={card} />
+            <PlayerNumber card={card} />
           </div>
         </div>
       </div>
