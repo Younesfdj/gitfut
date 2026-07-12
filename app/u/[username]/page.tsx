@@ -85,7 +85,15 @@ export default async function Page({
     <div className="relative min-h-screen overflow-x-hidden text-ink">
       <Background />
       {card ? (
-        <ScoutRoute card={card} stars={stars} canonicalCountry={canonicalCountry} />
+        <>
+          <Link
+            href="/leaderboard"
+            className="font-display absolute right-[clamp(16px,4vw,40px)] top-[clamp(14px,3vh,24px)] z-[3] text-[13px] tracking-[.1em] text-ink-soft transition hover:text-ink"
+          >
+            LEADERBOARD
+          </Link>
+          <ScoutRoute card={card} stars={stars} canonicalCountry={canonicalCountry} />
+        </>
       ) : (
         <NotScouted username={username} error={(res as { error: GithubError }).error} />
       )}
