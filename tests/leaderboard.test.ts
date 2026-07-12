@@ -61,6 +61,34 @@ describe("cardToMeta / serialize / parse", () => {
     expect(parseMeta("not json")).toBeNull();
     expect(parseMeta("{}")).toBeNull();
   });
+
+  it("parseMeta rejects partial/legacy JSON missing required fields", () => {
+    // The exact review case: enough to pass a login+overall check, but incomplete
+    // — must be rejected so consumers never see a MetaEntry with an undefined
+    // finish/position (which would crash RESULT_THEME[finish].chip downstream).
+    expect(parseMeta(JSON.stringify({ login: "x", overall: 1 }))).toBeNull();
+    expect(parseMeta(JSON.stringify(cardToMeta(mkCard("x", 70))))).not.toBeNull();
+  });
+
+  it("parseMeta rejects invalid enum values for finish / position", () => {
+    const good = cardToMeta(mkCard("x", 70));
+    expect(parseMeta(JSON.stringify({ ...good, finish: "platinum" }))).toBeNull();
+    expect(parseMeta(JSON.stringify({ ...good, position: "GK" }))).toBeNull();
+  });
+
+  it("parseMeta rejects wrong field types", () => {
+    const good = cardToMeta(mkCard("x", 70));
+    expect(parseMeta(JSON.stringify({ ...good, overall: "70" }))).toBeNull();
+    expect(parseMeta(JSON.stringify({ ...good, name: 5 }))).toBeNull();
+    expect(parseMeta(JSON.stringify({ ...good, topLanguage: 3 }))).toBeNull();
+    const { country: _country, ...noCountry } = good;
+    expect(parseMeta(JSON.stringify(noCountry))).toBeNull();
+  });
+
+  it("parseMeta accepts a fully-valid record incl. null topLanguage/langSlug", () => {
+    const m = cardToMeta(mkCard("x", 70, { languageLogo: null, topLanguage: null }));
+    expect(parseMeta(JSON.stringify(m))).toEqual(m);
+  });
 });
 
 describe("assembleEntries", () => {

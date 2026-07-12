@@ -39,17 +39,66 @@ export function cardToMeta(card: Card): MetaEntry {
 
 export const serializeMeta = (card: Card): string => JSON.stringify(cardToMeta(card));
 
-// Tolerant parse: any bad/missing/legacy JSON yields null so the row is skipped
-// rather than crashing the page (best-effort, mirrors lib/scout.ts readCache).
+// Runtime allow-lists for the enum fields, declared as Record<Union, true> so the
+// compiler forces every Finish/Position variant to be listed here (add a new
+// finish to the type and this stops compiling until it's added). isFinish /
+// isPosition then narrow an unknown value against them.
+const FINISH_VALUES: Record<Finish, true> = {
+  bronze: true,
+  silver: true,
+  gold: true,
+  totw: true,
+  toty: true,
+  icon: true,
+  founder: true,
+};
+const POSITION_VALUES: Record<Position, true> = {
+  ST: true,
+  RW: true,
+  CAM: true,
+  CM: true,
+  CDM: true,
+  CB: true,
+};
+const has = (o: object, v: unknown): boolean => typeof v === "string" && Object.prototype.hasOwnProperty.call(o, v);
+const isFinish = (v: unknown): v is Finish => has(FINISH_VALUES, v);
+const isPosition = (v: unknown): v is Position => has(POSITION_VALUES, v);
+
+// Full-shape guard: every MetaEntry field must be present and the right type, and
+// finish/position must be real enum values. Downstream consumers (e.g. the row's
+// RESULT_THEME[finish] lookup) assume a complete, valid record, so a partial or
+// legacy blob must be rejected, not passed through.
+function isMetaEntry(v: unknown): v is MetaEntry {
+  if (typeof v !== "object" || v === null) return false;
+  const m = v as Record<string, unknown>;
+  return (
+    typeof m.login === "string" &&
+    typeof m.name === "string" &&
+    typeof m.avatarUrl === "string" &&
+    typeof m.overall === "number" &&
+    Number.isFinite(m.overall) &&
+    isFinish(m.finish) &&
+    typeof m.finishLabel === "string" &&
+    isPosition(m.position) &&
+    typeof m.country === "string" &&
+    (m.topLanguage === null || typeof m.topLanguage === "string") &&
+    (m.langSlug === null || typeof m.langSlug === "string")
+  );
+}
+
+// Tolerant parse: any bad/missing/legacy/corrupt JSON yields null so the row is
+// skipped rather than crashing the page (best-effort, mirrors lib/scout.ts
+// readCache). Validates the FULL MetaEntry shape — a partially-populated blob like
+// { login, overall } is rejected, since consumers assume a complete record.
 export function parseMeta(json: string | null): MetaEntry | null {
   if (!json) return null;
+  let raw: unknown;
   try {
-    const m = JSON.parse(json) as MetaEntry;
-    if (!m || typeof m.login !== "string" || typeof m.overall !== "number") return null;
-    return m;
+    raw = JSON.parse(json);
   } catch {
     return null;
   }
+  return isMetaEntry(raw) ? raw : null;
 }
 
 // Zip parallel members + metas into ranked entries. rank is tied to the member's
