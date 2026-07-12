@@ -7,6 +7,7 @@ import { loadCard } from "@/lib/scout";
 import { getRepoStars } from "@/lib/github/stars";
 import { pickFlag } from "@/lib/flagPriority";
 import { recordScout } from "@/lib/analytics";
+import { recordLeaderboardEntry } from "@/lib/leaderboard";
 import type { Card } from "@/lib/scoring/types";
 import ScoutRoute from "./ScoutRoute";
 
@@ -72,7 +73,10 @@ export default async function Page({
   let card: Card | null = "card" in res ? res.card : null;
   let canonicalCountry = ""; // GitHub-derived flag; share links omit ?country= unless overridden
   if (card) {
-    after(() => recordScout()); // analytics, flushed after the response (serverless-safe)
+    const scouted = card; // canonical card, before the display-flag override below
+    // analytics + leaderboard, flushed after the response (serverless-safe).
+    // Returned so after()/waitUntil keeps the Redis writes alive until they settle.
+    after(() => Promise.all([recordScout(), recordLeaderboardEntry(scouted)]));
     canonicalCountry = pickFlag(null, card.country) ?? ""; // GitHub-derived only
     const displayCountry = pickFlag(override, card.country) ?? "";
     card = { ...card, country: displayCountry };

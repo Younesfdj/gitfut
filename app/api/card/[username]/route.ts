@@ -2,6 +2,7 @@ import { type GithubError } from "@/lib/github/client";
 import { scoutCard } from "@/lib/scout";
 import { pickFlag } from "@/lib/flagPriority";
 import { recordScout } from "@/lib/analytics";
+import { recordLeaderboardEntry } from "@/lib/leaderboard";
 import { after } from "next/server";
 import type { Card } from "@/lib/scoring/types";
 
@@ -18,7 +19,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ username
   // just resolve the visitor's flag and record the scout after the response.
   try {
     const card = await scoutCard(username);
-    after(() => recordScout());
+    after(() => Promise.all([recordScout(), recordLeaderboardEntry(card)]));
     return Response.json(resolveCountry(card, override));
   } catch (e) {
     const err = e as GithubError;

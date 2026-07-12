@@ -8,6 +8,7 @@ import { loadCard } from "@/lib/scout";
 import { getRepoStars } from "@/lib/github/stars";
 import { pickFlag } from "@/lib/flagPriority";
 import { recordScout } from "@/lib/analytics";
+import { recordLeaderboardEntry } from "@/lib/leaderboard";
 import { computeDuel } from "@/lib/duel";
 import type { Card } from "@/lib/scoring/types";
 
@@ -118,7 +119,16 @@ export default async function Page({ params }: Params) {
     );
   }
 
-  after(() => Promise.all([recordScout(), recordScout()])); // a duel is two scouts
+  // a duel is two scouts — record both, and add both to the leaderboard.
+  // Returned so after()/waitUntil keeps the Redis writes alive until they settle.
+  after(() =>
+    Promise.all([
+      recordScout(),
+      recordScout(),
+      recordLeaderboardEntry(a.card),
+      recordLeaderboardEntry(b.card),
+    ]),
+  );
 
   const duel = computeDuel(withFlag(a.card), withFlag(b.card));
   return (
