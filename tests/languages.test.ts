@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { languageLogoUrl, logoSlugFor, rankLanguages, topLanguageLogo } from "@/lib/github/languages";
+import { LANGUAGE_SLUGS, languageLogoUrl, logoSlugFor, rankLanguages, topLanguageLogo } from "@/lib/github/languages";
 
 // We test the language DECISIONS: deterministic ranking with markup demotion, the
 // GitHub-name→Devicon-id map (incl. display names + the Go wordmark), and that the
@@ -130,6 +130,17 @@ describe("languageLogoUrl", () => {
     expect(languageLogoUrl("c-original")).toBe(
       "https://cdn.jsdelivr.net/npm/programming-languages-logos/src/c/c.png",
     );
+  });
+
+  // The dir is the id's FIRST SEGMENT, so an id whose dir itself contains a hyphen
+  // silently resolves to the wrong dir and 404s. Devicon really ships one such icon
+  // ("dot-net" → dir "dot"), so this guards every future addition, not just today's.
+  it("every catalog id is a hyphenless dir + a real Devicon variant", () => {
+    const ID = /^[a-z0-9]+-(original|plain|line)(-wordmark)?$/;
+    for (const [name, slug] of Object.entries(LANGUAGE_SLUGS)) {
+      if (slug === "rescript") continue; // override-only: never hits the Devicon path
+      expect(slug, `${name} → ${slug}`).toMatch(ID);
+    }
   });
 });
 
