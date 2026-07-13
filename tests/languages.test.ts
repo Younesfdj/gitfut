@@ -57,9 +57,43 @@ describe("logoSlugFor", () => {
   });
 
   it("returns null for languages Devicon doesn't cover", () => {
-    for (const name of ["Fortran", "COBOL", "Brainfuck"]) {
+    // Fortran and COBOL used to sit here; both are covered now, so this falls back
+    // to languages Devicon still genuinely lacks.
+    for (const name of ["Assembly", "Ada", "Brainfuck"]) {
       expect(logoSlugFor(name)).toBeNull();
     }
+  });
+
+  it("resolves languages that used to headline a card with no logo", () => {
+    expect(logoSlugFor("Elm")).toBe("elm-original");
+    expect(logoSlugFor("Nix")).toBe("nixos-original");
+    expect(logoSlugFor("Gleam")).toBe("gleam-original");
+    expect(logoSlugFor("Astro")).toBe("astro-original");
+    expect(logoSlugFor("Groovy")).toBe("groovy-original");
+    expect(logoSlugFor("MATLAB")).toBe("matlab-original");
+    expect(logoSlugFor("Fortran")).toBe("fortran-original");
+    expect(logoSlugFor("COBOL")).toBe("cobol-original");
+  });
+
+  it("maps GitHub display names that differ from the Devicon dir", () => {
+    expect(logoSlugFor("F#")).toBe("fsharp-original");
+    expect(logoSlugFor("Visual Basic .NET")).toBe("visualbasic-original");
+    expect(logoSlugFor("WebAssembly")).toBe("wasm-original");
+  });
+
+  it("uses the tool's mark where that's the language's canonical logo", () => {
+    expect(logoSlugFor("Vim Script")).toBe("vim-original");
+    expect(logoSlugFor("Emacs Lisp")).toBe("emacs-original");
+    expect(logoSlugFor("GDScript")).toBe("godot-original");
+    expect(logoSlugFor("HCL")).toBe("terraform-original");
+    expect(logoSlugFor("PLpgSQL")).toBe("postgresql-original");
+  });
+
+  it("uses GraphQL's -plain variant (Devicon ships no -original, which would 404)", () => {
+    expect(logoSlugFor("GraphQL")).toBe("graphql-plain");
+    expect(languageLogoUrl("graphql-plain")).toBe(
+      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/graphql/graphql-plain.svg",
+    );
   });
 });
 
@@ -70,7 +104,7 @@ describe("topLanguageLogo", () => {
   });
 
   it("does NOT fall back — a top language Devicon lacks gets no logo", () => {
-    expect(topLanguageLogo(["Fortran", "TypeScript"])).toBeNull();
+    expect(topLanguageLogo(["Assembly", "TypeScript"])).toBeNull();
   });
 
   it("uses a styling logo only when there's no programming language", () => {
