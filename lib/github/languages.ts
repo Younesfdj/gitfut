@@ -126,12 +126,14 @@ const NON_HEADLINE = new Set([
   "css", "scss", "sass", "less", "stylus", "postcss",
   // markup / templates
   "html", "xml", "svg", "pug", "haml", "ejs", "handlebars", "mustache", "liquid",
+  "jinja", "twig", "blade", "smarty", "nunjucks",
   // prose
-  "markdown", "mdx", "tex",
+  "markdown", "mdx", "tex", "asciidoc", "restructuredtext", "org", "roff", "rich text format",
   // data
   "json", "yaml", "toml", "csv", "ini",
-  // build / config
-  "dockerfile", "makefile", "cmake",
+  // build / config — infra-as-code lands here for the same reason Dockerfile does:
+  // one large terraform/ dir shouldn't headline an otherwise Go or Python dev.
+  "dockerfile", "makefile", "cmake", "hcl", "terraform",
 ]);
 
 // A "headline" language is a real programming language (anything not in the

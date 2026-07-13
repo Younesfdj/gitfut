@@ -133,6 +133,26 @@ describe("languageLogoUrl", () => {
   });
 });
 
+describe("headline demotion, extended", () => {
+  it("keeps infra-as-code from headlining a real programming language", () => {
+    expect(rankLanguages(repos("HCL", "HCL", "HCL", "Go", "Go"))).toEqual(["Go", "HCL"]);
+  });
+
+  it("still headlines infra-as-code when it's all the dev has", () => {
+    expect(rankLanguages(repos("HCL", "HCL", "Terraform"))).toEqual(["HCL", "Terraform"]);
+  });
+
+  it("demotes newly-listed templates and prose", () => {
+    expect(rankLanguages(repos("Jinja", "Jinja", "Python"))).toEqual(["Python", "Jinja"]);
+    expect(rankLanguages(repos("Blade", "Blade", "PHP"))).toEqual(["PHP", "Blade"]);
+    expect(rankLanguages(repos("AsciiDoc", "AsciiDoc", "Rust"))).toEqual(["Rust", "AsciiDoc"]);
+  });
+
+  it("treats Nix as a real language, not config", () => {
+    expect(rankLanguages(repos("Nix", "Nix", "Dockerfile", "Dockerfile"))).toEqual(["Nix", "Dockerfile"]);
+  });
+});
+
 describe("ReScript (Devicon lacks it — overridden to Material Icon Theme)", () => {
   it("resolves the slug and headlines its own logo", () => {
     expect(logoSlugFor("ReScript")).toBe("rescript");
