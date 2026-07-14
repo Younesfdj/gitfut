@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { Card } from "@/lib/scoring/types";
 import PlayerCard from "./PlayerCard";
+import TiltCard from "./TiltCard";
 import StoryFrame from "./StoryFrame";
 import CardActions from "./CardActions";
 import DuelButton from "./DuelButton";
@@ -16,7 +17,7 @@ import GithubStar from "./GithubStar";
 import dynamic from "next/dynamic";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
 import DistributionPanel from "./DistributionPanel";
-import { confettiPalette, resolveResultTheme } from "./finishTheme";
+import { confettiPalette, resolveCardTheme, resolveResultTheme } from "./finishTheme";
 import { useReveal } from "@/hooks/useReveal";
 import { burstConfetti } from "@/lib/confetti";
 
@@ -157,19 +158,24 @@ export default function ResultView({
               The editor overlays the flag slot but lives OUTSIDE captureRef, so the
               downloaded/copied PNG never includes the picker UI. */}
           <div className="animate-walkout relative" style={{ width: CARD_WIDTH }}>
-            <div ref={captureRef} className="relative">
-              <div
-                className="animate-glow pointer-events-none absolute -inset-[12%] z-0 rounded-full"
-                style={{
-                  background: `radial-gradient(closest-side, ${theme.glow}, transparent 72%)`,
-                  opacity: ignited ? 1 : 0,
-                  transition: "opacity .6s ease",
-                }}
-              />
-              <div className="relative z-[1]">
-                <PlayerCard card={card} />
+            {/* The tilt wraps captureRef rather than sitting inside it, so the hover
+                glass is a sibling of the captured tree and never lands in the PNG.
+                maskSrc clips the shine to the card's own silhouette. */}
+            <TiltCard maskSrc={resolveCardTheme(card).bg}>
+              <div ref={captureRef} className="relative">
+                <div
+                  className="animate-glow pointer-events-none absolute -inset-[12%] z-0 rounded-full"
+                  style={{
+                    background: `radial-gradient(closest-side, ${theme.glow}, transparent 72%)`,
+                    opacity: ignited ? 1 : 0,
+                    transition: "opacity .6s ease",
+                  }}
+                />
+                <div className="relative z-[1]">
+                  <PlayerCard card={card} />
+                </div>
               </div>
-            </div>
+            </TiltCard>
             <FlagPicker value={card.country} onChange={onCountryChange} />
           </div>
           <div className="flex flex-col gap-[10px]" style={{ width: CARD_WIDTH }}>
