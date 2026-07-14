@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useReducer, useRef } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useReducer, useRef } from "react";
 import { Pencil, Plus, Search, X } from "lucide-react";
-import { searchCountries } from "@/lib/countries";
+import { flagPickerList } from "@/lib/wc26";
 import { comboboxReducer, initialComboboxState } from "@/lib/comboboxNav";
 import { useClickOutside } from "@/hooks/useClickOutside";
 
@@ -41,7 +41,11 @@ export default function FlagPicker({ value, onChange }: Props) {
   const listId = `${baseId}-list`;
   const optionId = (i: number) => `${baseId}-opt-${i}`;
 
-  const results = useMemo(() => searchCountries(query), [query]);
+  // Browsing shows the 48 World-Cup teams first, so a national team isn't buried
+  // 200 countries down; searching is left exactly as searchCountries ranked it
+  // (see flagPickerList). The list stays FLAT either way — the combobox addresses
+  // its options by index — so the group headers below are rendered as non-options.
+  const { list: results, qualifiedCount } = useMemo(() => flagPickerList(query), [query]);
 
   const close = useCallback(() => dispatch({ type: "close" }), []);
   useClickOutside(rootRef, open, close);
@@ -203,9 +207,28 @@ export default function FlagPicker({ value, onChange }: Props) {
             {results.map((c, i) => {
               const selected = c.code === value;
               const highlighted = i === active;
+              // Headers sit at the two group boundaries and are NOT options: they
+              // carry role="presentation" so they stay out of the listbox's index
+              // space, which is what arrow keys and aria-activedescendant address.
+              const header =
+                qualifiedCount === 0
+                  ? null
+                  : i === 0
+                    ? "World Cup 26"
+                    : i === qualifiedCount
+                      ? "All countries"
+                      : null;
               return (
+                <Fragment key={c.code}>
+                  {header && (
+                    <li
+                      role="presentation"
+                      className="px-[10px] pb-[4px] pt-[10px] text-[10px] font-semibold uppercase tracking-[.12em] text-ink-mute"
+                    >
+                      {header}
+                    </li>
+                  )}
                 <li
-                  key={c.code}
                   id={optionId(i)}
                   role="option"
                   aria-selected={selected}
@@ -229,6 +252,7 @@ export default function FlagPicker({ value, onChange }: Props) {
                   </span>
                   {selected && <span className="h-[6px] w-[6px] flex-none rounded-full bg-brand" />}
                 </li>
+                </Fragment>
               );
             })}
           </ul>
