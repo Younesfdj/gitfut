@@ -11,6 +11,7 @@ import BuyMeACoffee from "@/components/BuyMeACoffee";
 import SupportProductHunt from "@/components/SupportProductHunt";
 import GithubStar from "@/components/GithubStar";
 import { SAMPLE_CARDS } from "@/lib/github/samples";
+import Link from "next/link";
 
 const HowItWorksModal = dynamic(() => import("@/components/HowItWorksModal"), {
   ssr: false,
@@ -57,7 +58,14 @@ export default function AppShell({
       <main className="relative z-[2] flex min-h-screen flex-col">
         {/* Overlaid in the corner (not a flow header) so it never pushes the
             vertically-centered hero down. */}
-        <div className="absolute right-[clamp(20px,5vw,52px)] top-[clamp(16px,3vh,26px)] z-[3]">
+        <div className="absolute right-[clamp(20px,5vw,52px)] top-[clamp(16px,3vh,26px)] z-[3] flex items-center gap-2">
+          <Link
+            href="/leaderboard"
+            className="inline-flex items-center rounded-full border border-line bg-bg-deep/55 px-[13px] py-[7px] text-[13px] font-semibold text-ink-soft backdrop-blur-md transition duration-200 hover:-translate-y-px hover:border-ink-mute hover:bg-bg-deep/80 hover:text-ink"
+          >
+            <span className="max-[520px]:hidden">Leaderboard</span>
+            <span className="min-[521px]:hidden">🏆</span>
+          </Link>
           <GithubStar stars={stars} />
         </div>
         <div className="mx-auto flex w-full max-w-[1180px] flex-1 items-center gap-[clamp(24px,5vw,72px)] px-[clamp(22px,5vw,56px)] max-[860px]:flex-col max-[860px]:gap-[34px] max-[860px]:pb-6 max-[860px]:pt-[clamp(40px,6vh,56px)] max-[860px]:text-center">

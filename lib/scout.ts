@@ -6,6 +6,7 @@ import { fetchProfile, type GithubError } from "./github/client";
 import { signalsFromPayload } from "./github/signals";
 import { SAMPLE_CARDS } from "./github/samples";
 import type { Card } from "./scoring/types";
+import { recordLeaderboardEntry } from "./leaderboard";
 
 // Read-through Redis cache for built cards — the single path every scout surface
 // (the /<user> page, the JSON API, the OG image) uses to turn a username into a
@@ -64,6 +65,7 @@ const inflight = new Map<string, Promise<Card>>();
 async function buildFresh(username: string, login: string): Promise<Card> {
   const card = buildCard(signalsFromPayload(await fetchProfile(username)));
   await writeCache(login, card);
+  void recordLeaderboardEntry(card); // fire-and-forget, mirrors recordScout
   return card;
 }
 

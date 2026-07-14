@@ -22,3 +22,5 @@ function create(): Redis | null {
 
 export const redis: Redis | null =
   globalThis.__gitfutRedis !== undefined ? globalThis.__gitfutRedis : (globalThis.__gitfutRedis = create());
+
+   console.log("[redis]", redis ? "connected" : "NOT connected — check REDIS_URL");
