@@ -79,10 +79,7 @@ export default async function Page({
   }
   return (
     <div className="relative min-h-screen overflow-x-hidden text-ink">
-      {/* Only hide the decorative motif once there's REAL per-user data to take
-          its place — demo/sample cards and pre-v2-cache cards have no
-          contributionDays, and would otherwise leave neither grid showing. */}
-      <Background showContribGrid={!card?.contributionDays?.length} />
+      <Background contributionDays={card?.contributionDays} />
       {card ? (
         <ScoutRoute card={card} stars={stars} canonicalCountry={canonicalCountry} />
       ) : (

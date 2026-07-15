@@ -16,7 +16,6 @@ import GithubStar from "./GithubStar";
 import dynamic from "next/dynamic";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
 import DistributionPanel from "./DistributionPanel";
-import ContributionPanel from "./ContributionPanel";
 import { confettiPalette, resolveResultTheme } from "./finishTheme";
 import { useReveal } from "@/hooks/useReveal";
 import { burstConfetti } from "@/lib/confetti";
@@ -191,16 +190,6 @@ export default function ResultView({
             <DistributionPanel card={card} />
           </div>
         </div>
-      </div>
-
-      {/* The center column's own mb-14 (breathing room before the footer when
-          nothing else follows it) makes the grid row taller than the other two
-          columns, so this negative margin cancels that out on desktop where the
-          grid is active — same landing spot regardless of which column is
-          tallest. Below 980px the columns stack (center isn't last anymore),
-          so the plain positive margin applies there instead. */}
-      <div className="-mt-10 w-full max-[980px]:mt-[14px]">
-        <ContributionPanel card={card} />
       </div>
 
       <footer className="relative z-[2] mt-auto flex flex-none items-center justify-center p-[clamp(12px,2.6vh,24px)]">
