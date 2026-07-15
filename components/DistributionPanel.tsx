@@ -1,6 +1,7 @@
 "use client";
 
 import { DIST_ACTIVE_COUNTS, DIST_ACTIVE_N, DIST_COUNTS, DIST_MIN, DIST_N } from "@/lib/distribution-data";
+import { formatThousands } from "@/lib/format";
 import { resolveResultTheme } from "./finishTheme";
 import { Tip } from "./ScoutReport";
 import type { Card } from "@/lib/scoring/types";
@@ -35,9 +36,13 @@ export default function DistributionPanel({ card }: { card: Card }) {
   };
   const all = top(DIST_COUNTS, DIST_N);
   const act = top(DIST_ACTIVE_COUNTS, DIST_ACTIVE_N);
+  // Numbers in a <Tip> text node become part of the SSR HTML and are compared
+  // byte-for-byte at hydration — using formatThousands (locale-locked to en-US)
+  // prevents "5,000" vs "5.000" mismatches when the user's browser locale isn't
+  // the Node server's default.
   const tipText =
-    `Higher than ${(DIST_N - all.atOrAbove).toLocaleString()} of ${DIST_N.toLocaleString()} randomly sampled GitHub users, ` +
-    `and ${(DIST_ACTIVE_N - act.atOrAbove).toLocaleString()} of the ${DIST_ACTIVE_N.toLocaleString()} who were active in the past year.`;
+    `Higher than ${formatThousands(DIST_N - all.atOrAbove)} of ${formatThousands(DIST_N)} randomly sampled GitHub users, ` +
+    `and ${formatThousands(DIST_ACTIVE_N - act.atOrAbove)} of the ${formatThousands(DIST_ACTIVE_N)} who were active in the past year.`;
 
   return (
     <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-[16px]">
