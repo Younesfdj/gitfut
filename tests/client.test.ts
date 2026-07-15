@@ -277,6 +277,12 @@ describe("fetchProfile language diversity (owned ∪ contributed)", () => {
     expect(calls[0].body).toContain("commitContributionsByRepository");
   });
 
+  it("includes ORGANIZATION_MEMBER affiliation so org-created repos count toward stars", async () => {
+    scriptFetch((_t, body) => (body.includes("query Profile") ? ok({ data: { user: USER_LANGS } }) : ok({ data: { user: {} } })));
+    await fetchProfile(LOGIN, NOW);
+    expect(calls[0].body).toContain("ORGANIZATION_MEMBER");
+  });
+
   it("folds contributed public repos into the language set, deduped against owned repos", async () => {
     scriptFetch((_t, body) => (body.includes("query Profile") ? ok({ data: { user: USER_LANGS } }) : ok({ data: { user: {} } })));
     const payload = await fetchProfile(LOGIN, NOW);

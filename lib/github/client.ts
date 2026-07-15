@@ -208,7 +208,7 @@ function profileQuery(): string {
         location
         createdAt
         followers { totalCount }
-        repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
+        repositories(ownerAffiliations: [OWNER, ORGANIZATION_MEMBER], isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
           totalCount
           nodes { nameWithOwner stargazerCount primaryLanguage { name } createdAt pushedAt }
         }
