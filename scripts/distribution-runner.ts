@@ -38,7 +38,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { signalsFromPayload } from "../lib/github/signals";
 import { buildCard } from "../lib/scoring/engine";
-import type { RawPayload, RawRepo } from "../lib/github/client";
+import type { RawPayload, RawRepo, RawRepoLanguage } from "../lib/github/client";
 
 const TOKEN = process.env.GH_TOKEN!;
 // Deliberately above the current max existing user id (~299,755,500 as of
@@ -100,12 +100,16 @@ const PROFILE_QUERY = `
       followers { totalCount }
       repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
         totalCount
-        nodes { stargazerCount primaryLanguage { name } createdAt pushedAt }
+        nodes { nameWithOwner stargazerCount primaryLanguage { name } createdAt pushedAt }
       }
       recent: contributionsCollection {
         totalCommitContributions totalPullRequestContributions
         totalPullRequestReviewContributions totalIssueContributions
         restrictedContributionsCount
+        commitContributionsByRepository(maxRepositories: 100) {
+          contributions { totalCount }
+          repository { nameWithOwner isFork isPrivate primaryLanguage { name } }
+        }
         contributionCalendar { weeks { contributionDays { contributionCount } } }
       }
     }
@@ -120,7 +124,13 @@ interface UserNode {
   followers: { totalCount: number };
   repositories: {
     totalCount: number;
-    nodes: { stargazerCount: number; primaryLanguage: { name: string } | null; createdAt: string; pushedAt: string }[];
+    nodes: {
+      nameWithOwner: string;
+      stargazerCount: number;
+      primaryLanguage: { name: string } | null;
+      createdAt: string;
+      pushedAt: string;
+    }[];
   };
   recent: {
     totalCommitContributions: number;
@@ -128,6 +138,15 @@ interface UserNode {
     totalPullRequestReviewContributions: number;
     totalIssueContributions: number;
     restrictedContributionsCount: number;
+    commitContributionsByRepository: {
+      contributions: { totalCount: number };
+      repository: {
+        nameWithOwner: string;
+        isFork: boolean;
+        isPrivate: boolean;
+        primaryLanguage: { name: string } | null;
+      };
+    }[];
     contributionCalendar: { weeks: { contributionDays: { contributionCount: number }[] }[] };
   };
 }
@@ -187,6 +206,21 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
     createdAt: n.createdAt,
     pushedAt: n.pushedAt,
   }));
+  // Owned ∪ recently-contributed public repos, deduped — mirrors normalize() in
+  // lib/github/client.ts (incl. its 3-commit drive-by threshold) so the sampled
+  // distribution sees the same language signal production scoring does.
+  const languageByRepo = new Map<string, string | null>();
+  for (const n of user.repositories.nodes) {
+    languageByRepo.set(n.nameWithOwner, n.primaryLanguage?.name ?? null);
+  }
+  for (const c of user.recent.commitContributionsByRepository ?? []) {
+    const r = c.repository;
+    if (r.isFork || r.isPrivate || !r.primaryLanguage) continue;
+    if (c.contributions.totalCount < 3) continue;
+    if (languageByRepo.has(r.nameWithOwner)) continue;
+    languageByRepo.set(r.nameWithOwner, r.primaryLanguage.name);
+  }
+  const languageRepos: RawRepoLanguage[] = [...languageByRepo.values()].map((language) => ({ language }));
   const recentActiveDays = user.recent.contributionCalendar.weeks.reduce(
     (days, w) => days + w.contributionDays.filter((d) => d.contributionCount > 0).length,
     0,
@@ -200,6 +234,7 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
     followers: user.followers.totalCount,
     publicRepos: user.repositories.totalCount,
     repos,
+    languageRepos,
     recentCommits: user.recent.totalCommitContributions,
     recentPRs: user.recent.totalPullRequestContributions,
     recentReviews: user.recent.totalPullRequestReviewContributions,

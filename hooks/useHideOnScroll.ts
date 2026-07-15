@@ -7,16 +7,18 @@ import { useEffect, useRef, useState } from "react";
  * mobile-browser-chrome behavior: they slide away as you scroll DOWN a page
  * (out of the way while reading) and slide back the moment you scroll UP.
  *
- * Small screens only (default ≤560px, matching where the pills collapse to
- * icons). Above `query` it's a no-op — always visible — since there's room for
- * them to just sit there. Returns whether the pill should currently be hidden.
+ * Deliberately not gated by width. The pills only cover the report's
+ * bottom-right content (the DISTRIBUTION panel) when the page is tall enough to
+ * scroll — which is exactly when this fires, so scrolling down clears them off
+ * the stats. On a screen tall enough that nothing scrolls, the panel sits well
+ * above the pills and never collides, so they simply stay put as a persistent
+ * CTA. Returns whether the pill should currently be hidden.
  */
-export function useHideOnScroll(query = "(max-width: 560px)"): boolean {
+export function useHideOnScroll(): boolean {
   const [hidden, setHidden] = useState(false);
   const lastY = useRef(0);
 
   useEffect(() => {
-    const mq = window.matchMedia(query);
     lastY.current = window.scrollY;
 
     const onScroll = () => {
@@ -26,24 +28,13 @@ export function useHideOnScroll(query = "(max-width: 560px)"): boolean {
       // trembling finger can't flicker the pills in and out.
       if (Math.abs(dy) < 6) return;
       lastY.current = y;
-      // Wide viewport → never hide. Otherwise: scrolling down past the top hides;
-      // any upward scroll shows.
-      setHidden(mq.matches && dy > 0 && y > 40);
-    };
-
-    // Crossing the breakpoint (e.g. rotate to landscape) must never leave the
-    // pills stuck off-screen on a now-wide viewport.
-    const onChange = () => {
-      if (!mq.matches) setHidden(false);
+      // Scrolling down past the top hides; any upward scroll shows.
+      setHidden(dy > 0 && y > 40);
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    mq.addEventListener("change", onChange);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      mq.removeEventListener("change", onChange);
-    };
-  }, [query]);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return hidden;
 }

@@ -1,6 +1,20 @@
-// Compact number formatting for display (1240 → "1.2k", 248723 → "249k").
-export const formatCount = (n: number): string =>
-  n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, "") + "k" : String(Math.round(n));
+// Compact number formatting for display (1240 → "1.2k", 248723 → "249k", 1250000 → "1.3M").
+// One decimal below 10 units ("1.2k"), none above ("249k"), so the string stays short.
+const compact = (n: number, unit: number, suffix: string): string => {
+  const scaled = n / unit;
+  return scaled.toFixed(scaled >= 10 ? 0 : 1).replace(/\.0$/, "") + suffix;
+};
+
+export const formatCount = (n: number): string => {
+  if (n >= 1_000_000) return compact(n, 1_000_000, "M");
+  if (n >= 1000) {
+    const thousands = compact(n, 1000, "k");
+    // 999_950+ rounds up to "1000k"; roll over to the next unit rather than
+    // printing a four-digit thousands value.
+    return thousands === "1000k" ? compact(n, 1_000_000, "M") : thousands;
+  }
+  return String(Math.round(n));
+};
 
 // Fixed-precision rounding for deterministic geometry / imperative transforms —
 // shared so radar, VS burst and tilt all round identically.

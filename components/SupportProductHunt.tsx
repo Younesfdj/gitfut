@@ -6,8 +6,8 @@ import { useHideOnScroll } from "@/hooks/useHideOnScroll";
 const PH_URL = "https://www.producthunt.com/products/gitfut";
 
 // Floating support pill — mirrors BuyMeACoffee's treatment (see it for the
-// stacking/mount notes), stacked directly above it. Auto-hides on mobile
-// scroll-down in sync with it via the shared useHideOnScroll hook.
+// stacking/mount notes), stacked directly above it. Auto-hides on scroll-down
+// in sync with it via the shared useHideOnScroll hook.
 export default function SupportProductHunt() {
   const hidden = useHideOnScroll();
   return (
@@ -28,7 +28,9 @@ export default function SupportProductHunt() {
       }}
     >
       <span className="shrink-0" style={{ color: "#da552f" }}>
-        <ProductHuntLogo size={15} />
+        {/* Bigger in the icon-only phone mode (≤560px), where the pill is just
+            this mark in a 44px circle and 15px reads too small. */}
+        <ProductHuntLogo size={18} />
       </span>
       <span className="max-[560px]:hidden">Upvote Product Hunt</span>
     </a>

@@ -39,7 +39,7 @@ export default function BuyMeACoffee() {
       }}
     >
       <Coffee
-        size={15}
+        size={18}
         color="var(--color-gold)"
         aria-hidden
         className="shrink-0"

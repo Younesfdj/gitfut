@@ -73,6 +73,49 @@ export const LANGUAGE_SLUGS: Record<string, string> = {
   solidity: "solidity-original",
   nim: "nim-original",
   rescript: "rescript", // override-only (Devicon lacks it) — see LOGO_URL_OVERRIDES
+
+  // Where a language's canonical mark IS its tool, we use the tool's icon: Emacs
+  // Lisp → Emacs, Vim Script → Vim, GDScript → Godot, HCL → Terraform, PL/pgSQL
+  // → Postgres. That's the logo those communities actually recognise.
+  astro: "astro-original",
+  apex: "apex-original",
+  arduino: "arduino-original",
+  awk: "awk-original",
+  clojurescript: "clojurescript-original",
+  cmake: "cmake-original",
+  cobol: "cobol-original",
+  coffeescript: "coffeescript-original",
+  delphi: "delphi-original",
+  elm: "elm-original",
+  "emacs lisp": "emacs-original",
+  "f#": "fsharp-original",
+  fsharp: "fsharp-original",
+  fortran: "fortran-original",
+  gdscript: "godot-original",
+  gleam: "gleam-original",
+  graphql: "graphql-plain", // Devicon ships no "-original" for GraphQL
+  groovy: "groovy-original",
+  handlebars: "handlebars-original",
+  haxe: "haxe-original",
+  hcl: "terraform-original", // GitHub reports Terraform files as HCL
+  mathematica: "wolfram-original",
+  matlab: "matlab-original",
+  nix: "nixos-original",
+  plpgsql: "postgresql-original",
+  processing: "processing-original",
+  prolog: "prolog-original",
+  purescript: "purescript-original",
+  racket: "racket-original",
+  terraform: "terraform-original",
+  tex: "tex-original",
+  tsql: "microsoftsqlserver-plain",
+  vala: "vala-original",
+  vba: "visualbasic-original",
+  "vim script": "vim-original",
+  "vim snippet": "vim-original",
+  "visual basic": "visualbasic-original",
+  "visual basic .net": "visualbasic-original",
+  webassembly: "wasm-original",
 };
 
 // Styling / markup / prose / data / config languages (lowercased). These inflate
@@ -83,12 +126,14 @@ const NON_HEADLINE = new Set([
   "css", "scss", "sass", "less", "stylus", "postcss",
   // markup / templates
   "html", "xml", "svg", "pug", "haml", "ejs", "handlebars", "mustache", "liquid",
+  "jinja", "twig", "blade", "smarty", "nunjucks",
   // prose
-  "markdown", "mdx", "tex",
+  "markdown", "mdx", "tex", "asciidoc", "restructuredtext", "org", "roff", "rich text format",
   // data
   "json", "yaml", "toml", "csv", "ini",
-  // build / config
-  "dockerfile", "makefile", "cmake",
+  // build / config — infra-as-code lands here for the same reason Dockerfile does:
+  // one large terraform/ dir shouldn't headline an otherwise Go or Python dev.
+  "dockerfile", "makefile", "cmake", "hcl", "terraform",
 ]);
 
 // A "headline" language is a real programming language (anything not in the
