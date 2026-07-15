@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Clock,
   Crown,
@@ -62,13 +62,57 @@ export function Tip({
   align?: "left" | "right" | "center";
   children: React.ReactNode;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("touchstart", handleOutsideClick, { passive: true });
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen]);
+
+  const toggle = (e: React.MouseEvent | React.KeyboardEvent) => {
+    if (e.type === "keydown" && (e as React.KeyboardEvent).key !== "Enter" && (e as React.KeyboardEvent).key !== " ") {
+      return;
+    }
+    if (e.type === "keydown") {
+      e.preventDefault();
+    }
+    setIsOpen((prev) => !prev);
+  };
+
   const pos = align === "left" ? "left-0" : align === "right" ? "right-0" : "left-1/2 -translate-x-1/2";
   return (
-    <span className="group/tip relative inline-flex cursor-help items-center">
+    <span
+      ref={containerRef}
+      className="group/tip relative inline-flex cursor-help items-center outline-none rounded-sm focus-visible:ring-2 focus-visible:ring-white/20"
+      onClick={toggle}
+      onKeyDown={toggle}
+      tabIndex={0}
+      role="button"
+      aria-expanded={isOpen}
+    >
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none absolute bottom-full ${pos} z-30 mb-2 hidden w-max max-w-[220px] whitespace-normal rounded-lg border border-white/10 bg-[#17131f] px-3 py-2 text-left text-[12px] font-normal leading-snug text-ink-dim shadow-[0_10px_30px_rgba(0,0,0,.55)] group-hover/tip:block`}
+        className={`pointer-events-none absolute bottom-full ${pos} z-30 mb-2 w-max max-w-[220px] whitespace-normal rounded-lg border border-white/10 bg-[#17131f] px-3 py-2 text-left text-[12px] font-normal leading-snug text-ink-dim shadow-[0_10px_30px_rgba(0,0,0,.55)] ${
+          isOpen ? "block" : "hidden group-hover/tip:block"
+        }`}
       >
         {text}
       </span>
