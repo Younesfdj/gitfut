@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { Card } from "@/lib/scoring/types";
 import PlayerCard from "./PlayerCard";
+import TiltCard from "./TiltCard";
 import StoryFrame from "./StoryFrame";
 import CardActions from "./CardActions";
 import DuelButton from "./DuelButton";
@@ -16,7 +17,7 @@ import GithubStar from "./GithubStar";
 import dynamic from "next/dynamic";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
 import DistributionPanel from "./DistributionPanel";
-import { confettiPalette, resolveResultTheme } from "./finishTheme";
+import { confettiPalette, resolveCardTheme, resolveResultTheme } from "./finishTheme";
 import { useReveal } from "@/hooks/useReveal";
 import { burstConfetti } from "@/lib/confetti";
 
@@ -31,6 +32,9 @@ interface Props {
   stars?: number | null;
   /** GitHub-derived flag; share links only carry ?country= when it's overridden. */
   canonicalCountry?: string;
+  /** When true, the card was scouted client-side with the visitor's own token.
+   *  Disables sharing (no URL) and shows a "PRIVATE" badge. */
+  isPrivate?: boolean;
 }
 
 // Card width scales with the viewport but is bounded by BOTH width and height
@@ -43,6 +47,7 @@ export default function ResultView({
   onCountryChange,
   stars,
   canonicalCountry = "",
+  isPrivate = false,
 }: Props) {
   const captureRef = useRef<HTMLDivElement>(null);
   const storyRef = useRef<HTMLDivElement>(null);
@@ -167,19 +172,30 @@ export default function ResultView({
                 }}
               />
               <div className="relative z-[1]">
-                <PlayerCard card={card} />
+                <TiltCard maskSrc={resolveCardTheme(card).bg}>
+                  <PlayerCard card={card} />
+                </TiltCard>
               </div>
             </div>
             <FlagPicker value={card.country} onChange={onCountryChange} />
           </div>
           <div className="flex flex-col gap-[10px]" style={{ width: CARD_WIDTH }}>
-            <CardActions
-              card={card}
-              targetRef={captureRef}
-              storyRef={storyRef}
-              canonicalCountry={canonicalCountry}
-            />
-            <DuelButton login={card.login} />
+            {isPrivate ? (
+              <div className="flex items-center justify-center gap-[7px] rounded-xl border border-amber-500/30 bg-amber-500/[0.06] py-[10px] text-[12.5px] font-semibold text-amber-400">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                PRIVATE — not shareable
+              </div>
+            ) : (
+              <>
+                <CardActions
+                  card={card}
+                  targetRef={captureRef}
+                  storyRef={storyRef}
+                  canonicalCountry={canonicalCountry}
+                />
+                <DuelButton login={card.login} />
+              </>
+            )}
           </div>
         </div>
 
