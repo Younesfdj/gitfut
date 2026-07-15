@@ -5,6 +5,15 @@ const NOISE = `url("data:image/svg+xml;utf8,${encodeURIComponent(noiseSvg)}")`;
 // Faint GitHub-contribution-grid motif — a brand signature drawn into the
 // backdrop. A few cells gently pulse green (see .gf-grid-cell in globals.css).
 //
+// Cell geometry + colors are exported so the REAL per-user contribution graph
+// (ContributionPanel, on the scout result page) can match this exactly rather
+// than drifting into a second, different-looking grid.
+export const GRID_CELL = 12;
+export const GRID_PITCH = 16; // cell + gap
+export const GRID_RADIUS = 2.5;
+export const GRID_GREEN = "#39d353";
+export const GRID_EMPTY = "#1b2530";
+
 // The grid is fully deterministic, so we precompute it ONCE as a static SVG string and inject it via
 // dangerouslySetInnerHTML. This serializes as a single node in the RSC flight instead of 210 separate
 // <rect> flight nodes (each ~90B escaped), shrinking the inline hydration payload — while preserving the
@@ -18,12 +27,12 @@ const CONTRIB_GRID_SVG = (() => {
       const seed = (r * 7 + c * 13) % 11;
       const lit = seed < 3;
       const attrs = lit
-        ? ` fill="#39d353" class="gf-grid-cell" style="--gf-dur:${2.4 + seed * 0.4}s"`
-        : ` fill="#1b2530"`;
-      rects += `<rect x="${c * 16}" y="${r * 16}" width="12" height="12" rx="2.5"${attrs}/>`;
+        ? ` fill="${GRID_GREEN}" class="gf-grid-cell" style="--gf-dur:${2.4 + seed * 0.4}s"`
+        : ` fill="${GRID_EMPTY}"`;
+      rects += `<rect x="${c * GRID_PITCH}" y="${r * GRID_PITCH}" width="${GRID_CELL}" height="${GRID_CELL}" rx="${GRID_RADIUS}"${attrs}/>`;
     }
   }
-  return `<svg width="${cols * 16}" height="${rows * 16}" viewBox="0 0 ${cols * 16} ${rows * 16}" style="width:100%;height:100%" aria-hidden="true">${rects}</svg>`;
+  return `<svg width="${cols * GRID_PITCH}" height="${rows * GRID_PITCH}" viewBox="0 0 ${cols * GRID_PITCH} ${rows * GRID_PITCH}" style="width:100%;height:100%" aria-hidden="true">${rects}</svg>`;
 })();
 
 function ContribGrid() {
@@ -36,7 +45,7 @@ function ContribGrid() {
   );
 }
 
-export default function Background() {
+export default function Background({ showContribGrid = true }: { showContribGrid?: boolean } = {}) {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden bg-bg">
       {/* green ambient — the "action" color, top spotlight */}
@@ -92,13 +101,18 @@ export default function Background() {
       {/* contribution-grid motif, faint along the bottom. Hidden below 980px:
           narrow layouts stack content much taller than one viewport, so this
           "floor" strip ends up floating behind mid-page content instead of
-          only at the true bottom. */}
-      <div
-        className="absolute bottom-0 left-0 right-0 max-[980px]:hidden"
-        style={{ height: "16%", opacity: 0.5, maskImage: "linear-gradient(to top, #000, transparent)", WebkitMaskImage: "linear-gradient(to top, #000, transparent)" }}
-      >
-        <ContribGrid />
-      </div>
+          only at the true bottom. Suppressed entirely on the scout result
+          page (showContribGrid=false) — it renders the user's REAL
+          contribution graph as content there, so this decorative stand-in
+          would otherwise double up as a second, fake-data grid. */}
+      {showContribGrid && (
+        <div
+          className="absolute bottom-0 left-0 right-0 max-[980px]:hidden"
+          style={{ height: "16%", opacity: 0.5, maskImage: "linear-gradient(to top, #000, transparent)", WebkitMaskImage: "linear-gradient(to top, #000, transparent)" }}
+        >
+          <ContribGrid />
+        </div>
+      )}
       <div className="absolute inset-0" style={{ opacity: 0.04, backgroundImage: NOISE, mixBlendMode: "overlay" }} />
     </div>
   );
