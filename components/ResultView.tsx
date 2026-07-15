@@ -36,13 +36,7 @@ interface Props {
 
 // Card width scales with the viewport but is bounded by BOTH width and height
 // (and a hard min/max) so it never overflows a narrow phone or a short laptop.
-// The height term also has to leave room for everything below the card on a
-// short desktop viewport (scouting metrics, and now the contribution graph),
-// so it starts shrinking the card well before the viewport gets phone-short.
-// Floor is 260, not lower — CardActions' Download button (icon + label +
-// caret, alongside the two share icons) needs that much width before its
-// label starts truncating.
-const CARD_WIDTH = "clamp(260px, min(76vw, 29vh), 300px)";
+const CARD_WIDTH = "clamp(220px, min(80vw, 40vh), 332px)";
 
 export default function ResultView({
   card,
@@ -100,7 +94,7 @@ export default function ResultView({
       />
 
       {/* top bar: BACK button + mascot on the left, "how it works" on the right */}
-      <div className="mb-[8px] mt-[clamp(6px,1.2vh,12px)] flex w-full shrink-0 items-center justify-between gap-[10px]">
+      <div className="mb-[8px] mt-[clamp(8px,2vh,18px)] flex w-full shrink-0 items-center justify-between gap-[10px]">
         <div className="flex items-center gap-[10px]">
           <button
             onClick={onBack}
@@ -140,7 +134,7 @@ export default function ResultView({
         <ReportHeader card={card} />
       </div>
 
-      <div className="mt-[clamp(10px,1.6vh,18px)] grid grid-cols-[1fr_auto_1fr] items-start gap-[clamp(16px,2.4vw,40px)] max-[980px]:mt-6 max-[980px]:flex max-[980px]:flex-col max-[980px]:items-center">
+      <div className="mt-[clamp(14px,2.4vh,26px)] grid grid-cols-[1fr_auto_1fr] items-start gap-[clamp(16px,2.4vw,40px)] max-[980px]:mt-6 max-[980px]:flex max-[980px]:flex-col max-[980px]:items-center">
         {/* left — attributes + playstyles */}
         <div className="flex justify-end max-[980px]:order-2 max-[980px]:w-full max-[980px]:max-w-[420px] max-[980px]:justify-center">
           <div className="w-full max-w-[360px]">
@@ -149,7 +143,7 @@ export default function ResultView({
         </div>
 
         {/* center — the card + actions (the walkout happens here) */}
-        <div className="relative flex flex-col items-center gap-[clamp(8px,1.4vh,14px)] max-[980px]:order-1 mb-[clamp(12px,2vh,20px)]">
+        <div className="relative flex flex-col items-center gap-[clamp(12px,2vh,18px)] max-[980px]:order-1 mb-14">
           {/* spotlight wash — a soft, diffuse glow from above as the card rises.
               Reduced + blurred so it reads as ambient light, not a hard beam. */}
           <div
@@ -199,17 +193,17 @@ export default function ResultView({
         </div>
       </div>
 
-      {/* The center column's own trailing margin (breathing room when nothing
-          else follows it) makes the grid row taller than the other two
-          columns, so this small negative margin cancels most of that out on
-          desktop where the grid is active — same landing spot regardless of
-          which column is tallest. Below 980px the columns stack (center isn't
-          last anymore), so the plain positive margin applies there instead. */}
-      <div className="-mt-2 w-full max-[980px]:mt-[14px]">
+      {/* The center column's own mb-14 (breathing room before the footer when
+          nothing else follows it) makes the grid row taller than the other two
+          columns, so this negative margin cancels that out on desktop where the
+          grid is active — same landing spot regardless of which column is
+          tallest. Below 980px the columns stack (center isn't last anymore),
+          so the plain positive margin applies there instead. */}
+      <div className="-mt-10 w-full max-[980px]:mt-[14px]">
         <ContributionPanel card={card} />
       </div>
 
-      <footer className="relative z-[2] mt-auto flex flex-none items-center justify-center p-[clamp(8px,1.6vh,18px)]">
+      <footer className="relative z-[2] mt-auto flex flex-none items-center justify-center p-[clamp(12px,2.6vh,24px)]">
         <FooterCredit />
       </footer>
 
