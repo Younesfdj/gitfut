@@ -169,6 +169,38 @@ describe("fetchProfile token pool", () => {
   });
 });
 
+describe("fetchProfile contribution calendar", () => {
+  const USER_CALENDAR = {
+    ...USER,
+    recent: {
+      ...USER.recent,
+      contributionCalendar: {
+        weeks: [
+          { contributionDays: [{ contributionCount: 0, date: "2026-06-29" }, { contributionCount: 3, date: "2026-06-30" }] },
+          { contributionDays: [{ contributionCount: 0, date: "2026-07-01" }] },
+        ],
+      },
+    },
+  };
+
+  it("requests each day's date alongside its count", async () => {
+    scriptFetch((_t, body) => okFor(body));
+    await fetchProfile(LOGIN, NOW);
+    expect(calls[0].body).toContain("contributionDays { contributionCount date }");
+  });
+
+  it("flattens the calendar into contributionDays and derives recentActiveDays from it", async () => {
+    scriptFetch((_t, body) => (body.includes("query Profile") ? ok({ data: { user: USER_CALENDAR } }) : ok({ data: { user: {} } })));
+    const payload = await fetchProfile(LOGIN, NOW);
+    expect(payload.contributionDays).toEqual([
+      { date: "2026-06-29", count: 0 },
+      { date: "2026-06-30", count: 3 },
+      { date: "2026-07-01", count: 0 },
+    ]);
+    expect(payload.recentActiveDays).toBe(1);
+  });
+});
+
 describe("fetchProfile username validation", () => {
   it("accepts legacy usernames with a trailing hyphen (real GitHub accounts)", async () => {
     scriptFetch((_t, body) => okFor(body));

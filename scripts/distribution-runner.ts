@@ -242,6 +242,7 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
     recentRestricted: user.recent.restrictedContributionsCount,
     recentActiveDays,
     lifetimeContributions,
+    contributionDays: [], // unused by scoring; this script only feeds the distribution histogram
   };
 }
 

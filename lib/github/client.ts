@@ -40,6 +40,14 @@ export interface RawRepoLanguage {
   language: string | null;
 }
 
+// One day of the real per-user contribution calendar — the row shape behind
+// RawPayload.contributionDays below, and the input to lib/contributions.ts's
+// calendar -> panel transform.
+export interface ContributionDay {
+  date: string; // "YYYY-MM-DD", the UTC calendar date GitHub reports
+  count: number;
+}
+
 // Flat, normalized profile — all fields below are real GitHub data.
 export interface RawPayload {
   login: string;
@@ -58,6 +66,7 @@ export interface RawPayload {
   recentRestricted: number; // last-year private contributions (count only)
   recentActiveDays: number;
   lifetimeContributions: number; // all years, all types, incl. private
+  contributionDays: ContributionDay[]; // the full calendar recentActiveDays is reduced from — real per-day counts, for the profile's contribution graph
 }
 
 const ENDPOINT = "https://api.github.com/graphql";
@@ -120,7 +129,7 @@ interface UserNode {
         primaryLanguage: { name: string } | null;
       };
     }[];
-    contributionCalendar: { weeks: { contributionDays: { contributionCount: number }[] }[] };
+    contributionCalendar: { weeks: { contributionDays: { contributionCount: number; date: string }[] }[] };
   };
 }
 
@@ -222,7 +231,7 @@ function profileQuery(): string {
             contributions { totalCount }
             repository { nameWithOwner isFork isPrivate primaryLanguage { name } }
           }
-          contributionCalendar { weeks { contributionDays { contributionCount } } }
+          contributionCalendar { weeks { contributionDays { contributionCount date } } }
         }
       }
     }`;
@@ -350,10 +359,10 @@ function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
   }
   const languageRepos: RawRepoLanguage[] = [...languageByRepo.values()].map((language) => ({ language }));
 
-  const recentActiveDays = user.recent.contributionCalendar.weeks.reduce(
-    (days, w) => days + w.contributionDays.filter((d) => d.contributionCount > 0).length,
-    0,
+  const contributionDays: ContributionDay[] = user.recent.contributionCalendar.weeks.flatMap((w) =>
+    w.contributionDays.map((d) => ({ date: d.date, count: d.contributionCount })),
   );
+  const recentActiveDays = contributionDays.filter((d) => d.count > 0).length;
 
   return {
     login: user.login,
@@ -372,5 +381,6 @@ function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
     recentRestricted: user.recent.restrictedContributionsCount,
     recentActiveDays,
     lifetimeContributions,
+    contributionDays,
   };
 }
