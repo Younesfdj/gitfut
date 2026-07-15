@@ -228,7 +228,7 @@ export function ReportHeader({ card }: { card: Card }) {
       {/* left — the grade stamp: OVR over tier, the dossier's headline metric */}
       <Stagger step={0} className="shrink-0">
         <div
-          className="relative flex h-[clamp(78px,13vw,98px)] w-[clamp(78px,13vw,98px)] flex-col items-center justify-center rounded-2xl border"
+          className="relative flex h-[clamp(58px,min(13vw,9vh),98px)] w-[clamp(58px,min(13vw,9vh),98px)] flex-col items-center justify-center rounded-2xl border"
           style={{
             borderColor: `${accent}40`,
             background: `linear-gradient(160deg, ${accent}1a, transparent 70%), #0b0930`,
@@ -236,7 +236,7 @@ export function ReportHeader({ card }: { card: Card }) {
           }}
         >
           <span
-            className="font-display text-[clamp(34px,6vw,46px)] font-black leading-[.82] tabular-nums"
+            className="font-display text-[clamp(22px,min(6vw,4.2vh),46px)] font-black leading-[.82] tabular-nums"
             style={{ color: accent, filter: `drop-shadow(0 1px 8px ${accent}55)` }}
           >
             {card.overall}
@@ -256,7 +256,7 @@ export function ReportHeader({ card }: { card: Card }) {
             style={{ background: `radial-gradient(closest-side, ${theme.glow}, transparent 72%)` }}
           />
           <h2
-            className="font-display truncate text-[clamp(32px,5.4vw,56px)] font-black leading-[.92]"
+            className="font-display truncate text-[clamp(24px,min(5.4vw,5vh),56px)] font-black leading-[.92]"
             style={{
               backgroundImage: `linear-gradient(100deg, #e6edf3 0%, #e6edf3 38%, ${accent} 50%, #fff 54%, #e6edf3 64%, #e6edf3 100%)`,
               backgroundSize: "220% 100%",
