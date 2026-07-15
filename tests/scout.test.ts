@@ -8,7 +8,18 @@ vi.mock("server-only", () => ({}));
 const fetchProfile = vi.fn();
 vi.mock("@/lib/github/client", () => ({ fetchProfile: (u: string) => fetchProfile(u) }));
 vi.mock("@/lib/github/signals", () => ({ signalsFromPayload: (p: unknown) => p }));
-vi.mock("@/lib/scoring/engine", () => ({ buildCard: (s: unknown) => s }));
+// The real buildCard only forwards known Signals-derived fields — it does NOT
+// carry an incidental contributionDays prop through. Stripping it here (rather
+// than a plain identity pass-through) is what makes the assertions below
+// actually exercise buildFresh's explicit `contributionDays: payload.contributionDays`
+// re-attachment, instead of it passing by accident via the mock.
+vi.mock("@/lib/scoring/engine", () => ({
+  buildCard: (s: { contributionDays?: unknown }) => {
+    const rest = { ...s };
+    delete rest.contributionDays;
+    return rest;
+  },
+}));
 
 // In-memory Redis stand-in so read-through caching is exercised without a server.
 const store = new Map<string, string>();
@@ -35,7 +46,7 @@ function deferred<T>() {
 }
 
 const flush = () => new Promise<void>((r) => setTimeout(r, 0));
-const payload = (login: string) => ({ login, name: login });
+const payload = (login: string) => ({ login, name: login, contributionDays: [{ date: "2026-01-01", count: 3 }] });
 
 beforeEach(() => {
   store.clear();
@@ -99,5 +110,13 @@ describe("scoutCard single-flight", () => {
     fetchProfile.mockResolvedValueOnce(payload("torvalds"));
     await scoutCard("torvalds");
     expect(fetchProfile).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("scoutCard contribution calendar", () => {
+  it("carries contributionDays from the fetch onto the built card, even though buildCard itself drops it", async () => {
+    fetchProfile.mockResolvedValueOnce(payload("torvalds"));
+    const card = await scoutCard("torvalds");
+    expect(card.contributionDays).toEqual(payload("torvalds").contributionDays);
   });
 });

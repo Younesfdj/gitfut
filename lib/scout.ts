@@ -23,7 +23,7 @@ import type { Card } from "./scoring/types";
 // Namespaced alongside gitfut:scouts:total. The version segment lets a deploy
 // that changes buildCard's output shape or scoring invalidate every entry at
 // once (bump it) instead of serving stale-shaped cards until their TTL lapses.
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2"; // v2: Card gained contributionDays
 const CARD_TTL_SECONDS = 120 * 60; // 2h — GitHub stats move slowly; longer TTL = fewer refetches of hot profiles under load.
 
 const normalizeLogin = (username: string) => username.trim().replace(/^@/, "").toLowerCase();
@@ -62,7 +62,8 @@ async function writeCache(login: string, card: Card): Promise<void> {
 const inflight = new Map<string, Promise<Card>>();
 
 async function buildFresh(username: string, login: string): Promise<Card> {
-  const card = buildCard(signalsFromPayload(await fetchProfile(username)));
+  const payload = await fetchProfile(username);
+  const card: Card = { ...buildCard(signalsFromPayload(payload)), contributionDays: payload.contributionDays };
   await writeCache(login, card);
   return card;
 }
