@@ -3,7 +3,7 @@
 import { memo, type CSSProperties } from "react";
 import type { Card, StatKey } from "@/lib/scoring/types";
 import { languageLogoUrl } from "@/lib/github/languages";
-import { cardDisplayName } from "@/lib/text";
+import { cardDisplayName, getFitFontSize } from "@/lib/text";
 import { resolveCardTheme } from "./finishTheme";
 
 // Faithful port of the Python FUT generator's 540×820 layout. Positions are
@@ -260,19 +260,32 @@ function PlayerCard({ card }: { card: Card }) {
         />
       )}
 
-      {/* name (centered across the card) */}
+      {/* name — centered across the card. The wrapper is 100% wide so the inner
+          span (inline-block + nowrap) centers verbatim via text-align, and the
+          font-size steps down with display-name length so 19+ character names (e.g.
+          "ABCDEFGHIJKLMNOPQRS") stay inside the visible band (~83% of card,
+          framed by H_LINES[2]). The step function lives next to cardDisplayName
+          in lib/text.ts so live card, html-to-image export, and Satori share
+          identical sizing. */}
       <div
         style={{
-          ...at(50, 53.66),
-          transform: "translateX(-50%)",
-          fontFamily: FONT_BOLD,
-          fontSize: "13cqw",
-          fontWeight: 700,
-          whiteSpace: "nowrap",
-          color: ink,
+          ...at(0, 53.66),
+          width: "100%",
+          textAlign: "center",
         }}
       >
-        {displayName}
+        <span
+          style={{
+            display: "inline-block",
+            fontFamily: FONT_BOLD,
+            fontSize: `${getFitFontSize(displayName)}cqw`,
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+            color: ink,
+          }}
+        >
+          {displayName}
+        </span>
       </div>
 
       {/* six stats */}
