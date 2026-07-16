@@ -168,8 +168,20 @@ describe("fetchProfile token pool", () => {
           },
         });
       }
-      if (body.includes("query LifetimeContributionTotal(")) {
-        return ok({ data: { user: { c: { contributionCalendar: { totalContributions: 100 } } } } });
+      if (body.includes("query LifetimeContributionTotals(")) {
+        return ok({
+          data: {
+            user: {
+              c: {
+                totalCommitContributions: 70,
+                totalIssueContributions: 10,
+                totalPullRequestContributions: 15,
+                totalPullRequestReviewContributions: 2,
+                restrictedContributionsCount: 3,
+              },
+            },
+          },
+        });
       }
       if (body.includes("query Profile(")) {
         return ok({
@@ -182,7 +194,7 @@ describe("fetchProfile token pool", () => {
 
     const payload = await fetchProfile(LOGIN, NOW);
     const recentWindowCalls = calls.filter((c) => c.body.includes("query ResourceRecentWindow(")).length;
-    const lifetimeCalls = calls.filter((c) => c.body.includes("query LifetimeContributionTotal(")).length;
+    const lifetimeCalls = calls.filter((c) => c.body.includes("query LifetimeContributionTotals(")).length;
 
     expect(payload.login).toBe(LOGIN);
     expect(payload.recentCommits).toBe(recentWindowCalls);
@@ -207,6 +219,38 @@ describe("fetchProfile token pool", () => {
     );
 
     await expect(fetchProfile(LOGIN, NOW)).rejects.toMatchObject({ type: "network", message: "field failed" });
+  });
+
+  it("keeps real GitHub NOT_FOUND responses on the notfound path", async () => {
+    scriptFetch((_token, body) =>
+      body.includes("query Profile(")
+        ? ok({
+            data: { user: null },
+            errors: [
+              {
+                type: "NOT_FOUND",
+                path: ["user"],
+                message: "Could not resolve to a User with the login of 'missing-user'.",
+              },
+            ],
+          })
+        : okFor(body),
+    );
+
+    await expect(fetchProfile("missing-user", NOW)).rejects.toMatchObject({ type: "notfound" });
+  });
+
+  it("uses partial GraphQL data when field-level errors still include a profile", async () => {
+    scriptFetch((_token, body) =>
+      body.includes("query Profile(")
+        ? ok({
+            data: { user: USER },
+            errors: [{ type: "FORBIDDEN", message: "Resource protected by organization SAML enforcement." }],
+          })
+        : okFor(body),
+    );
+
+    await expect(fetchProfile(LOGIN, NOW)).resolves.toMatchObject({ login: LOGIN });
   });
 
   it("propagates the rate limit when every other token is benched", async () => {

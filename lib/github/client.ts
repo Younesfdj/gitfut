@@ -136,12 +136,8 @@ interface RecentWindowNode {
   c: RecentNode;
 }
 
-interface ContributionTotalNode {
-  c: {
-    contributionCalendar: {
-      totalContributions: number;
-    };
-  };
+interface ContributionTotalsNode {
+  c: YearContrib;
 }
 
 interface ContributionWindow {
@@ -218,10 +214,13 @@ async function gql<T>(query: string, login: string, tok: PoolToken, retries = 1)
       benchToken(tok.idx, res.headers);
       return fail("ratelimit", "GitHub rate limit hit. Try again shortly.");
     }
-    if (body.errors?.some((e) => e.type === "RESOURCE_LIMITS_EXCEEDED")) {
+    if (body.errors?.length && body.errors.every((e) => e.type === "NOT_FOUND")) {
+      return { user: null };
+    }
+    if (body.errors?.some((e) => e.type === "RESOURCE_LIMITS_EXCEEDED") && !body.data?.user) {
       return fail("resource", "GitHub query was too expensive for this profile.");
     }
-    if (body.errors?.length) {
+    if (body.errors?.length && !body.data?.user) {
       return fail("network", body.errors[0]?.message ?? "GitHub returned a GraphQL error.");
     }
     return { user: body.data?.user ?? null };
@@ -299,10 +298,14 @@ function recentWindowQuery(from: string, to: string): string {
 
 function contributionTotalQuery(from: string, to: string): string {
   return `
-    query LifetimeContributionTotal($login: String!) {
+    query LifetimeContributionTotals($login: String!) {
       user(login: $login) {
         c: contributionsCollection(from: "${from}", to: "${to}") {
-          contributionCalendar { totalContributions }
+          totalCommitContributions
+          totalIssueContributions
+          totalPullRequestContributions
+          totalPullRequestReviewContributions
+          restrictedContributionsCount
         }
       }
     }`;
@@ -361,9 +364,11 @@ function addUtcDays(date: Date, days: number): Date {
 
 function contributionWindows(from: Date, to: Date, days: number): ContributionWindow[] {
   const windows: ContributionWindow[] = [];
-  for (let start = startOfUtcDay(from); start <= to; start = addUtcDays(start, days)) {
+  let start = new Date(from);
+  while (start <= to) {
     const end = new Date(Math.min(endOfUtcDay(addUtcDays(start, days - 1)).getTime(), to.getTime()));
     windows.push({ from: start.toISOString(), to: end.toISOString() });
+    start = new Date(end.getTime() + 1);
   }
   return windows;
 }
@@ -464,13 +469,13 @@ async function fetchLifetime(
 
 async function fetchRecentWindow(login: string, tok: PoolToken, w: ContributionWindow): Promise<RecentNode> {
   try {
-    const { user } = await gql<RecentWindowNode>(recentWindowQuery(w.from, w.to), login, tok, 0);
+    const { user } = await gql<RecentWindowNode>(recentWindowQuery(w.from, w.to), login, tok);
     return user?.c ?? emptyRecent();
   } catch (e) {
     const err = e as GithubError;
     if (err.type === "resource") {
       const split = splitWindow(w);
-      if (split) return combineRecent(await Promise.all(split.map((part) => fetchRecentWindow(login, tok, part))));
+      if (split) return combineRecent([await fetchRecentWindow(login, tok, split[0]), await fetchRecentWindow(login, tok, split[1])]);
       return emptyRecent();
     }
     if (err.type === "network") return emptyRecent();
@@ -486,13 +491,19 @@ async function fetchWindowedRecent(login: string, tok: PoolToken, now: Date): Pr
 
 async function fetchContributionTotal(login: string, tok: PoolToken, w: ContributionWindow): Promise<number> {
   try {
-    const { user } = await gql<ContributionTotalNode>(contributionTotalQuery(w.from, w.to), login, tok, 0);
-    return user?.c.contributionCalendar.totalContributions ?? 0;
+    const { user } = await gql<ContributionTotalsNode>(contributionTotalQuery(w.from, w.to), login, tok);
+    return user?.c
+      ? user.c.totalCommitContributions +
+          user.c.totalIssueContributions +
+          user.c.totalPullRequestContributions +
+          user.c.totalPullRequestReviewContributions +
+          user.c.restrictedContributionsCount
+      : 0;
   } catch (e) {
     const err = e as GithubError;
     if (err.type === "resource") {
       const split = splitWindow(w);
-      if (split) return (await Promise.all(split.map((part) => fetchContributionTotal(login, tok, part)))).reduce((a, b) => a + b, 0);
+      if (split) return (await fetchContributionTotal(login, tok, split[0])) + (await fetchContributionTotal(login, tok, split[1]));
       return 0;
     }
     if (err.type === "network") return 0;
