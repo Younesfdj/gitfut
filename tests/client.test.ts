@@ -41,6 +41,7 @@ const USER = {
     totalPullRequestReviewContributions: 0,
     totalIssueContributions: 0,
     restrictedContributionsCount: 0,
+    commitContributionsByRepository: [],
     contributionCalendar: { weeks: [] },
   },
 };
@@ -126,6 +127,58 @@ describe("fetchProfile token pool", () => {
     expect(payload.login).toBe(LOGIN);
     expect(calls[0].token).toBe(primary);
     expect(calls[1].token).not.toBe(primary);
+  });
+
+  it("falls back to a lean card when GitHub rejects the full contribution query as too expensive", async () => {
+    const basicUser = {
+      login: USER.login,
+      name: USER.name,
+      avatarUrl: USER.avatarUrl,
+      location: USER.location,
+      createdAt: USER.createdAt,
+      followers: USER.followers,
+      repositories: USER.repositories,
+    };
+    scriptFetch((_token, body) => {
+      if (body.includes("query ProfileBasics(")) return ok({ data: { user: basicUser } });
+      if (body.includes("query FallbackContributionTotal(")) {
+        return ok({
+          data: {
+            user: {
+              recent: {
+                contributionCalendar: { totalContributions: 6065 },
+              },
+            },
+          },
+        });
+      }
+      if (body.includes("query Profile(")) {
+        return ok({
+          data: { user: null },
+          errors: [{ type: "RESOURCE_LIMITS_EXCEEDED", message: "Resource limits for this query exceeded." }],
+        });
+      }
+      return ok({ data: { user: {} } });
+    });
+
+    const payload = await fetchProfile(LOGIN, NOW);
+
+    expect(payload.login).toBe(LOGIN);
+    expect(payload.recentCommits).toBe(6065);
+    expect(payload.lifetimeContributions).toBe(6065);
+    expect(calls.some((c) => c.body.includes("query ProfileBasics("))).toBe(true);
+    expect(calls.some((c) => c.body.includes("query FallbackContributionTotal("))).toBe(true);
+    expect(calls.some((c) => c.body.includes("query Lifetime("))).toBe(false);
+  });
+
+  it("surfaces GraphQL execution errors instead of treating null partial data as not found", async () => {
+    scriptFetch((_token, body) =>
+      body.includes("query Profile(")
+        ? ok({ data: { user: null }, errors: [{ type: "SOMETHING_ELSE", message: "field failed" }] })
+        : okFor(body),
+    );
+
+    await expect(fetchProfile(LOGIN, NOW)).rejects.toMatchObject({ type: "network", message: "field failed" });
   });
 
   it("propagates the rate limit when every other token is benched", async () => {

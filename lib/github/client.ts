@@ -17,7 +17,7 @@ import { tokenPool, pickToken, pickFailover, recordTokenHealth, benchToken, type
 // the years in small parallel batches with a retry — and tolerate a dropped
 // batch (the figure is only used log-scaled, so a missing year barely moves it).
 
-export type GithubErrorType = "invalid" | "notfound" | "ratelimit" | "network" | "config";
+export type GithubErrorType = "invalid" | "notfound" | "ratelimit" | "resource" | "network" | "config";
 
 export interface GithubError {
   type: GithubErrorType;
@@ -124,6 +124,16 @@ interface UserNode {
   };
 }
 
+type ProfileBasicsNode = Omit<UserNode, "recent">;
+
+interface FallbackContributionTotalNode {
+  recent: {
+    contributionCalendar: {
+      totalContributions: number;
+    };
+  };
+}
+
 interface YearContrib {
   totalCommitContributions: number;
   totalIssueContributions: number;
@@ -193,6 +203,12 @@ async function gql<T>(query: string, login: string, tok: PoolToken, retries = 1)
       benchToken(tok.idx, res.headers);
       return fail("ratelimit", "GitHub rate limit hit. Try again shortly.");
     }
+    if (body.errors?.some((e) => e.type === "RESOURCE_LIMITS_EXCEEDED")) {
+      return fail("resource", "GitHub query was too expensive for this profile.");
+    }
+    if (body.errors?.length) {
+      return fail("network", body.errors[0]?.message ?? "GitHub returned a GraphQL error.");
+    }
     return { user: body.data?.user ?? null };
   }
   return fail("network", "GitHub request failed."); // unreachable; satisfies the type checker
@@ -223,6 +239,35 @@ function profileQuery(): string {
             repository { nameWithOwner isFork isPrivate primaryLanguage { name } }
           }
           contributionCalendar { weeks { contributionDays { contributionCount } } }
+        }
+      }
+    }`;
+}
+
+function profileBasicsQuery(): string {
+  return `
+    query ProfileBasics($login: String!) {
+      user(login: $login) {
+        login
+        name
+        avatarUrl(size: 480)
+        location
+        createdAt
+        followers { totalCount }
+        repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
+          totalCount
+          nodes { nameWithOwner stargazerCount primaryLanguage { name } createdAt pushedAt }
+        }
+      }
+    }`;
+}
+
+function fallbackContributionTotalQuery(): string {
+  return `
+    query FallbackContributionTotal($login: String!) {
+      user(login: $login) {
+        recent: contributionsCollection {
+          contributionCalendar { totalContributions }
         }
       }
     }`;
@@ -290,6 +335,44 @@ async function fetchLifetime(
   return sums.reduce((a, b) => a + b, 0);
 }
 
+function fallbackRecent(totalContributions: number): UserNode["recent"] {
+  return {
+    // When GitHub refuses the detailed contribution query, keep the card scouted
+    // with the cheap public contribution total rather than misreporting 404.
+    totalCommitContributions: totalContributions,
+    totalPullRequestContributions: 0,
+    totalPullRequestReviewContributions: 0,
+    totalIssueContributions: 0,
+    restrictedContributionsCount: 0,
+    commitContributionsByRepository: [],
+    contributionCalendar: { weeks: [] },
+  };
+}
+
+async function fetchFallbackContributionTotal(login: string, tok: PoolToken): Promise<number> {
+  try {
+    const { user } = await gql<FallbackContributionTotalNode>(fallbackContributionTotalQuery(), login, tok, 0);
+    return user?.recent.contributionCalendar.totalContributions ?? 0;
+  } catch (e) {
+    const err = e as GithubError;
+    if (err.type === "resource" || err.type === "network") return 0;
+    throw e;
+  }
+}
+
+async function fetchResourceLimitedProfile(login: string, tok: PoolToken): Promise<RawPayload> {
+  const { user } = await gql<ProfileBasicsNode>(profileBasicsQuery(), login, tok);
+  if (!user) return fail("notfound", "No GitHub user by that name.");
+
+  const contributionTotal = await fetchFallbackContributionTotal(login, tok);
+  const fallbackUser: UserNode = { ...user, recent: fallbackRecent(contributionTotal) };
+
+  // Lifetime needs many contribution windows, the same family of resolvers that
+  // already exceeded GitHub's resource budget. Use the last-year total as a
+  // conservative lower bound so the profile renders inside the request budget.
+  return normalize(fallbackUser, contributionTotal);
+}
+
 export async function fetchProfile(username: string, now = new Date()): Promise<RawPayload> {
   const login = username.trim().replace(/^@/, "");
   if (!VALID.test(login)) return fail("invalid", "That doesn't look like a GitHub username.");
@@ -305,13 +388,19 @@ export async function fetchProfile(username: string, now = new Date()): Promise<
   try {
     ({ user } = await gql<UserNode>(profileQuery(), login, tok));
   } catch (e) {
+    if ((e as GithubError).type === "resource") return fetchResourceLimitedProfile(login, tok);
     // Only a rate limit is cured by another token (a timeout or 5xx would just
     // fail again) — retry once on the healthiest token, if the pool has one.
     if ((e as GithubError).type !== "ratelimit" || pool.length < 2) throw e;
     const fallback = await pickFailover(tok.idx, pool);
     if (!fallback) throw e; // every other token is benched too
     tok = fallback;
-    ({ user } = await gql<UserNode>(profileQuery(), login, tok));
+    try {
+      ({ user } = await gql<UserNode>(profileQuery(), login, tok));
+    } catch (retryErr) {
+      if ((retryErr as GithubError).type === "resource") return fetchResourceLimitedProfile(login, tok);
+      throw retryErr;
+    }
   }
   if (!user) return fail("notfound", "No GitHub user by that name.");
 
