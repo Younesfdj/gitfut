@@ -129,7 +129,7 @@ describe("fetchProfile token pool", () => {
     expect(calls[1].token).not.toBe(primary);
   });
 
-  it("falls back to a lean card when GitHub rejects the full contribution query as too expensive", async () => {
+  it("falls back to windowed contribution data when GitHub rejects the full query as too expensive", async () => {
     const basicUser = {
       login: USER.login,
       name: USER.name,
@@ -141,16 +141,35 @@ describe("fetchProfile token pool", () => {
     };
     scriptFetch((_token, body) => {
       if (body.includes("query ProfileBasics(")) return ok({ data: { user: basicUser } });
-      if (body.includes("query FallbackContributionTotal(")) {
+      if (body.includes("query ResourceRecentWindow(")) {
         return ok({
           data: {
             user: {
-              recent: {
-                contributionCalendar: { totalContributions: 6065 },
+              c: {
+                totalCommitContributions: 1,
+                totalPullRequestContributions: 2,
+                totalPullRequestReviewContributions: 3,
+                totalIssueContributions: 4,
+                restrictedContributionsCount: 5,
+                commitContributionsByRepository: [
+                  {
+                    contributions: { totalCount: 1 },
+                    repository: {
+                      nameWithOwner: "acme/api",
+                      isFork: false,
+                      isPrivate: false,
+                      primaryLanguage: { name: "Go" },
+                    },
+                  },
+                ],
+                contributionCalendar: { weeks: [{ contributionDays: [{ contributionCount: 1 }, { contributionCount: 0 }] }] },
               },
             },
           },
         });
+      }
+      if (body.includes("query LifetimeContributionTotal(")) {
+        return ok({ data: { user: { c: { contributionCalendar: { totalContributions: 100 } } } } });
       }
       if (body.includes("query Profile(")) {
         return ok({
@@ -162,12 +181,21 @@ describe("fetchProfile token pool", () => {
     });
 
     const payload = await fetchProfile(LOGIN, NOW);
+    const recentWindowCalls = calls.filter((c) => c.body.includes("query ResourceRecentWindow(")).length;
+    const lifetimeCalls = calls.filter((c) => c.body.includes("query LifetimeContributionTotal(")).length;
 
     expect(payload.login).toBe(LOGIN);
-    expect(payload.recentCommits).toBe(6065);
-    expect(payload.lifetimeContributions).toBe(6065);
+    expect(payload.recentCommits).toBe(recentWindowCalls);
+    expect(payload.recentPRs).toBe(recentWindowCalls * 2);
+    expect(payload.recentReviews).toBe(recentWindowCalls * 3);
+    expect(payload.recentIssues).toBe(recentWindowCalls * 4);
+    expect(payload.recentRestricted).toBe(recentWindowCalls * 5);
+    expect(payload.recentActiveDays).toBe(recentWindowCalls);
+    expect(payload.lifetimeContributions).toBe(lifetimeCalls * 100);
+    expect(payload.languageRepos).toContainEqual({ language: "Go" });
     expect(calls.some((c) => c.body.includes("query ProfileBasics("))).toBe(true);
-    expect(calls.some((c) => c.body.includes("query FallbackContributionTotal("))).toBe(true);
+    expect(recentWindowCalls).toBeGreaterThan(0);
+    expect(lifetimeCalls).toBeGreaterThan(0);
     expect(calls.some((c) => c.body.includes("query Lifetime("))).toBe(false);
   });
 

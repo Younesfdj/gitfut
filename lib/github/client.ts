@@ -69,6 +69,9 @@ const ENDPOINT = "https://api.github.com/graphql";
 const VALID = /^(?=.*[a-z\d])[a-z\d-]{1,39}$/i;
 const GITHUB_EPOCH_YEAR = 2008; // GitHub launched Feb 2008; no account predates it.
 const LIFETIME_BATCH = 4; // contribution windows per request — stays well under GitHub's timeout.
+const DAY_MS = 86_400_000;
+const RESOURCE_RECENT_WINDOW_DAYS = 21;
+const RESOURCE_WINDOW_CONCURRENCY = 4;
 // A repo only feeds the language signal once the user has really worked in it —
 // this many commits in the last year — so a single drive-by typo fix to a large
 // polyglot repo can't inflate their language diversity.
@@ -126,12 +129,24 @@ interface UserNode {
 
 type ProfileBasicsNode = Omit<UserNode, "recent">;
 
-interface FallbackContributionTotalNode {
-  recent: {
+type RecentNode = UserNode["recent"];
+type RepoContribution = RecentNode["commitContributionsByRepository"][number];
+
+interface RecentWindowNode {
+  c: RecentNode;
+}
+
+interface ContributionTotalNode {
+  c: {
     contributionCalendar: {
       totalContributions: number;
     };
   };
+}
+
+interface ContributionWindow {
+  from: string;
+  to: string;
 }
 
 interface YearContrib {
@@ -262,11 +277,31 @@ function profileBasicsQuery(): string {
     }`;
 }
 
-function fallbackContributionTotalQuery(): string {
+function recentWindowQuery(from: string, to: string): string {
   return `
-    query FallbackContributionTotal($login: String!) {
+    query ResourceRecentWindow($login: String!) {
       user(login: $login) {
-        recent: contributionsCollection {
+        c: contributionsCollection(from: "${from}", to: "${to}") {
+          totalCommitContributions
+          totalPullRequestContributions
+          totalPullRequestReviewContributions
+          totalIssueContributions
+          restrictedContributionsCount
+          commitContributionsByRepository(maxRepositories: 100) {
+            contributions { totalCount }
+            repository { nameWithOwner isFork isPrivate primaryLanguage { name } }
+          }
+          contributionCalendar { weeks { contributionDays { contributionCount } } }
+        }
+      }
+    }`;
+}
+
+function contributionTotalQuery(from: string, to: string): string {
+  return `
+    query LifetimeContributionTotal($login: String!) {
+      user(login: $login) {
+        c: contributionsCollection(from: "${from}", to: "${to}") {
           contributionCalendar { totalContributions }
         }
       }
@@ -291,6 +326,98 @@ ${aliases}
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) {
+        const i = next++;
+        results[i] = await fn(items[i]);
+      }
+    }),
+  );
+  return results;
+}
+
+function startOfUtcDay(date: Date): Date {
+  const d = new Date(date);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfUtcDay(date: Date): Date {
+  const d = new Date(date);
+  d.setUTCHours(23, 59, 59, 999);
+  return d;
+}
+
+function addUtcDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * DAY_MS);
+}
+
+function contributionWindows(from: Date, to: Date, days: number): ContributionWindow[] {
+  const windows: ContributionWindow[] = [];
+  for (let start = startOfUtcDay(from); start <= to; start = addUtcDays(start, days)) {
+    const end = new Date(Math.min(endOfUtcDay(addUtcDays(start, days - 1)).getTime(), to.getTime()));
+    windows.push({ from: start.toISOString(), to: end.toISOString() });
+  }
+  return windows;
+}
+
+function splitWindow(w: ContributionWindow): [ContributionWindow, ContributionWindow] | null {
+  const from = new Date(w.from);
+  const to = new Date(w.to);
+  if (to.getTime() - from.getTime() < DAY_MS) return null;
+  const mid = endOfUtcDay(new Date(from.getTime() + Math.floor((to.getTime() - from.getTime()) / 2)));
+  return [
+    { from: from.toISOString(), to: mid.toISOString() },
+    { from: addUtcDays(startOfUtcDay(mid), 1).toISOString(), to: to.toISOString() },
+  ];
+}
+
+function emptyRecent(): RecentNode {
+  return {
+    totalCommitContributions: 0,
+    totalPullRequestContributions: 0,
+    totalPullRequestReviewContributions: 0,
+    totalIssueContributions: 0,
+    restrictedContributionsCount: 0,
+    commitContributionsByRepository: [],
+    contributionCalendar: { weeks: [] },
+  };
+}
+
+function combineRecent(parts: RecentNode[]): RecentNode {
+  const out = emptyRecent();
+  const repos = new Map<string, RepoContribution>();
+
+  for (const p of parts) {
+    out.totalCommitContributions += p.totalCommitContributions;
+    out.totalPullRequestContributions += p.totalPullRequestContributions;
+    out.totalPullRequestReviewContributions += p.totalPullRequestReviewContributions;
+    out.totalIssueContributions += p.totalIssueContributions;
+    out.restrictedContributionsCount += p.restrictedContributionsCount;
+    out.contributionCalendar.weeks.push(...p.contributionCalendar.weeks);
+
+    for (const c of p.commitContributionsByRepository ?? []) {
+      const key = c.repository.nameWithOwner;
+      const existing = repos.get(key);
+      if (existing) {
+        existing.contributions.totalCount += c.contributions.totalCount;
+      } else {
+        repos.set(key, {
+          contributions: { totalCount: c.contributions.totalCount },
+          repository: c.repository,
+        });
+      }
+    }
+  }
+
+  out.commitContributionsByRepository = [...repos.values()];
   return out;
 }
 
@@ -335,42 +462,67 @@ async function fetchLifetime(
   return sums.reduce((a, b) => a + b, 0);
 }
 
-function fallbackRecent(totalContributions: number): UserNode["recent"] {
-  return {
-    // When GitHub refuses the detailed contribution query, keep the card scouted
-    // with the cheap public contribution total rather than misreporting 404.
-    totalCommitContributions: totalContributions,
-    totalPullRequestContributions: 0,
-    totalPullRequestReviewContributions: 0,
-    totalIssueContributions: 0,
-    restrictedContributionsCount: 0,
-    commitContributionsByRepository: [],
-    contributionCalendar: { weeks: [] },
-  };
-}
-
-async function fetchFallbackContributionTotal(login: string, tok: PoolToken): Promise<number> {
+async function fetchRecentWindow(login: string, tok: PoolToken, w: ContributionWindow): Promise<RecentNode> {
   try {
-    const { user } = await gql<FallbackContributionTotalNode>(fallbackContributionTotalQuery(), login, tok, 0);
-    return user?.recent.contributionCalendar.totalContributions ?? 0;
+    const { user } = await gql<RecentWindowNode>(recentWindowQuery(w.from, w.to), login, tok, 0);
+    return user?.c ?? emptyRecent();
   } catch (e) {
     const err = e as GithubError;
-    if (err.type === "resource" || err.type === "network") return 0;
+    if (err.type === "resource") {
+      const split = splitWindow(w);
+      if (split) return combineRecent(await Promise.all(split.map((part) => fetchRecentWindow(login, tok, part))));
+      return emptyRecent();
+    }
+    if (err.type === "network") return emptyRecent();
     throw e;
   }
 }
 
-async function fetchResourceLimitedProfile(login: string, tok: PoolToken): Promise<RawPayload> {
+async function fetchWindowedRecent(login: string, tok: PoolToken, now: Date): Promise<RecentNode> {
+  const from = new Date(now.getTime() - 365 * DAY_MS);
+  const windows = contributionWindows(from, now, RESOURCE_RECENT_WINDOW_DAYS);
+  return combineRecent(await mapLimit(windows, RESOURCE_WINDOW_CONCURRENCY, (w) => fetchRecentWindow(login, tok, w)));
+}
+
+async function fetchContributionTotal(login: string, tok: PoolToken, w: ContributionWindow): Promise<number> {
+  try {
+    const { user } = await gql<ContributionTotalNode>(contributionTotalQuery(w.from, w.to), login, tok, 0);
+    return user?.c.contributionCalendar.totalContributions ?? 0;
+  } catch (e) {
+    const err = e as GithubError;
+    if (err.type === "resource") {
+      const split = splitWindow(w);
+      if (split) return (await Promise.all(split.map((part) => fetchContributionTotal(login, tok, part)))).reduce((a, b) => a + b, 0);
+      return 0;
+    }
+    if (err.type === "network") return 0;
+    throw e;
+  }
+}
+
+async function fetchLifetimeTotals(login: string, tok: PoolToken, createdYear: number, currentYear: number, now: Date): Promise<number> {
+  const years: ContributionWindow[] = [];
+  for (let y = Math.max(createdYear, GITHUB_EPOCH_YEAR); y <= currentYear; y++) {
+    years.push({
+      from: `${y}-01-01T00:00:00.000Z`,
+      to: y === currentYear ? now.toISOString() : `${y}-12-31T23:59:59.999Z`,
+    });
+  }
+  const totals = await mapLimit(years, RESOURCE_WINDOW_CONCURRENCY, (w) => fetchContributionTotal(login, tok, w));
+  return totals.reduce((a, b) => a + b, 0);
+}
+
+async function fetchResourceLimitedProfile(login: string, tok: PoolToken, now: Date): Promise<RawPayload> {
   const { user } = await gql<ProfileBasicsNode>(profileBasicsQuery(), login, tok);
   if (!user) return fail("notfound", "No GitHub user by that name.");
 
-  const contributionTotal = await fetchFallbackContributionTotal(login, tok);
-  const fallbackUser: UserNode = { ...user, recent: fallbackRecent(contributionTotal) };
+  const createdYear = new Date(user.createdAt).getUTCFullYear();
+  const [recent, lifetimeContributions] = await Promise.all([
+    fetchWindowedRecent(login, tok, now),
+    fetchLifetimeTotals(login, tok, createdYear, now.getUTCFullYear(), now),
+  ]);
 
-  // Lifetime needs many contribution windows, the same family of resolvers that
-  // already exceeded GitHub's resource budget. Use the last-year total as a
-  // conservative lower bound so the profile renders inside the request budget.
-  return normalize(fallbackUser, contributionTotal);
+  return normalize({ ...user, recent }, lifetimeContributions);
 }
 
 export async function fetchProfile(username: string, now = new Date()): Promise<RawPayload> {
@@ -388,7 +540,7 @@ export async function fetchProfile(username: string, now = new Date()): Promise<
   try {
     ({ user } = await gql<UserNode>(profileQuery(), login, tok));
   } catch (e) {
-    if ((e as GithubError).type === "resource") return fetchResourceLimitedProfile(login, tok);
+    if ((e as GithubError).type === "resource") return fetchResourceLimitedProfile(login, tok, now);
     // Only a rate limit is cured by another token (a timeout or 5xx would just
     // fail again) — retry once on the healthiest token, if the pool has one.
     if ((e as GithubError).type !== "ratelimit" || pool.length < 2) throw e;
@@ -398,7 +550,7 @@ export async function fetchProfile(username: string, now = new Date()): Promise<
     try {
       ({ user } = await gql<UserNode>(profileQuery(), login, tok));
     } catch (retryErr) {
-      if ((retryErr as GithubError).type === "resource") return fetchResourceLimitedProfile(login, tok);
+      if ((retryErr as GithubError).type === "resource") return fetchResourceLimitedProfile(login, tok, now);
       throw retryErr;
     }
   }
