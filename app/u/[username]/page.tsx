@@ -79,7 +79,7 @@ export default async function Page({
   }
   return (
     <div className="relative min-h-screen overflow-x-hidden text-ink">
-      <Background />
+      <Background contributionDays={card?.contributionDays} />
       {card ? (
         <ScoutRoute card={card} stars={stars} canonicalCountry={canonicalCountry} />
       ) : (

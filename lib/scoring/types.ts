@@ -1,3 +1,5 @@
+import type { ContributionDay } from "@/lib/contributions";
+
 export type StatKey = "pac" | "sho" | "pas" | "dri" | "def" | "phy";
 export type Stats = Record<StatKey, number>;
 export type Profile = Record<StatKey, number>;
@@ -103,4 +105,9 @@ export interface Card {
   // Optional so every other card (and previously serialized ones) stay valid.
   founder?: FounderMeta;
   report: Report;
+  // Full last-year daily calendar for the profile's contribution graph — from
+  // the scout fetch already made (lib/github/client.ts), not a new API call.
+  // Optional: absent on demo/sample cards and cards cached before this field
+  // existed.
+  contributionDays?: ContributionDay[];
 }
