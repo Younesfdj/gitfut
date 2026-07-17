@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Card, StatKey } from "@/lib/scoring/types";
 import { resolveCardTheme } from "@/components/finishTheme";
 import { languageLogoUrl } from "@/lib/github/languages";
-import { cardDisplayName } from "@/lib/text";
+import { cardDisplayName, getFitFontSize } from "@/lib/text";
 import { loadCardFonts } from "./card";
 
 // Server-side re-creation of the in-app PlayerCard (components/PlayerCard.tsx),
@@ -176,9 +176,11 @@ export function cardTree(card: Card, assets: CardAssets, w: number) {
       {/* top language logo */}
       {logo && <img alt="" src={logo} style={{ ...at(19.06, 42.25), width: "11.875%", height: "7.5%", objectFit: "contain" }} />}
 
-      {/* name — centered across the card */}
+      {/* name — centered across the card. fontSize steps down with display-name
+          length via lib/text.getFitFontSize, mirroring <PlayerCard> exactly; Satori has
+          no DOM to measure so the length-based heuristic is shared across both paths. */}
       <div style={{ position: "absolute", left: 0, top: "53.66%", width: "100%", display: "flex", justifyContent: "center" }}>
-        <div style={{ display: "flex", fontSize: cqw(13), fontWeight: 700, color: ink, whiteSpace: "nowrap" }}>{displayName}</div>
+        <div style={{ display: "flex", fontSize: cqw(getFitFontSize(displayName)), fontWeight: 700, color: ink, whiteSpace: "nowrap" }}>{displayName}</div>
       </div>
 
       {/* six stat values + labels (flat absolute children so the % positions
