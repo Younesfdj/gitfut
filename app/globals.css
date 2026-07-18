@@ -386,3 +386,13 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Custom pointer overrides for fine-pointer devices */
+@media (pointer: fine) {
+  body, a, button, [role="button"], label {
+    cursor: none !important;
+  }
+  input, textarea, [contenteditable="true"] {
+    cursor: text !important;
+  }
+}

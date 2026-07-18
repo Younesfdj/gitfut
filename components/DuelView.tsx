@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Link2, Repeat, Share2 } from "lucide-react";
 import { dominanceShare, tallyRows, type Duel, type DuelSide } from "@/lib/duel";
@@ -20,6 +21,9 @@ import { useShareActions } from "@/hooks/useShareActions";
 import { resolvedRows } from "@/lib/reveal";
 import { formatCount } from "@/lib/format";
 import { duelIntentUrl, duelSharePayload, duelUrl } from "@/lib/share";
+import dynamic from "next/dynamic";
+
+const Trophy3D = dynamic(() => import("./Trophy3D"), { ssr: false });
 
 const CARD_WIDTH = "clamp(150px, min(24vw, 34vh), 292px)";
 
@@ -152,6 +156,57 @@ export default function DuelView({
   stars: number | null;
 }) {
   const { challenger, opponent, rows, winner, onPenalties, training } = duel;
+  
+  const [activeAward, setActiveAward] = useState<{ key: string; card: Card } | null>(null);
+
+  // Close details modal on Escape key press
+  useEffect(() => {
+    if (!activeAward) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setActiveAward(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeAward]);
+
+  const getAwardDetails = (key: string, card: Card) => {
+    const details: Record<string, {
+      title: string;
+      metricLabel: string;
+      description: string;
+      model: string;
+      scale: number;
+      value: string;
+    }> = {
+      world_cup: {
+        title: "World Cup Trophy",
+        metricLabel: "Generational Champion",
+        description: "The ultimate prize. Awarded to legendary champions whose overall rating reflects complete mastery across all aspects of software engineering.",
+        model: "/3D-Models/world_cup_trophy.glb",
+        scale: 0.65,
+        value: `OVR ${card.overall} (Requires >= 85)`
+      },
+      golden_boot: {
+        title: "Golden Boot",
+        metricLabel: "Elite Star Attraction",
+        description: "Awarded to players who demonstrate world-class shooting power by attracting massive stars across their repositories.",
+        model: "/3D-Models/golden_boot.glb",
+        scale: 0.5,
+        value: `SHO ${card.stats.sho} (Requires >= 80)`
+      },
+      golden_glove: {
+        title: "Golden Glove",
+        metricLabel: "Clean Sheet Defender",
+        description: "Awarded to the premier defenders of the codebase who keep the sheets clean through meticulous code reviews and issue resolutions.",
+        model: "/3D-Models/golden_glove.glb",
+        scale: 0.6,
+        value: `DEF ${card.stats.def} (Requires >= 60)`
+      }
+    };
+    return details[key];
+  };
   // Kit clash (see finishTheme): ONLY a toty/totw vs silver pairing recolors —
   // the toty side wears its saturated tier blue so the sides stay readable.
   const { home: aTheme, away: bTheme } = duelThemes(challenger, opponent);
@@ -205,6 +260,14 @@ export default function DuelView({
   const corner = (card: Card, theme: { ink: string }, side: DuelSide) => {
     const won = focus === side;
     const lost = focus !== null && !won;
+    
+    // Determine awards
+    const shoRow = rows.find(r => r.key === 'sho');
+    const defRow = rows.find(r => r.key === 'def');
+    const winsBoot = shoRow?.winner === side || shoRow?.winner === null;
+    const winsGlove = defRow?.winner === side || defRow?.winner === null;
+    const winsCup = winner === side || winner === null;
+    
     return (
       <div
         className={`flex flex-col items-center gap-[10px] ${
@@ -218,6 +281,53 @@ export default function DuelView({
           transition: "opacity .7s ease, filter .7s ease",
         }}
       >
+        {/* Achievements Card Display */}
+        {settled && (winsBoot || winsCup || winsGlove) && (
+          <section 
+            className="rounded-2xl border border-white/[0.06] bg-[#0b0930]/35 backdrop-blur-sm p-[12px_8px] flex flex-col gap-1.5 mb-[12px] animate-rise-soft shadow-[0_8px_20px_rgba(0,0,0,0.3)]"
+            style={{ width: CARD_WIDTH }}
+          >
+            <div className="flex items-center gap-[6px] justify-start text-left px-1">
+              <span className="h-[2px] w-[10px] rounded-full bg-brand" />
+              <h3 className="font-display text-[8.5px] font-bold tracking-[.25em] text-ink-mute uppercase">ACHIEVED AWARDS</h3>
+            </div>
+            <div className="flex justify-evenly mt-1 items-center gap-1">
+              {winsCup && (
+                <div
+                  onClick={() => setActiveAward({ key: "world_cup", card })}
+                  className="flex flex-col items-center cursor-pointer group"
+                >
+                  <div className="group-hover:scale-110 active:scale-95 transition-transform duration-200">
+                    <Trophy3D modelPath="/3D-Models/world_cup_trophy.glb" scale={1.3} position={[0, 0, 0]} rotationSpeed={0.8} size={68} />
+                  </div>
+                  <span className="text-[7.5px] font-mono font-bold text-ink-mute tracking-wider mt-0.5 group-hover:text-gold transition-colors">WORLD CUP</span>
+                </div>
+              )}
+              {winsBoot && (
+                <div
+                  onClick={() => setActiveAward({ key: "golden_boot", card })}
+                  className="flex flex-col items-center cursor-pointer group"
+                >
+                  <div className="group-hover:scale-110 active:scale-95 transition-transform duration-200">
+                    <Trophy3D modelPath="/3D-Models/golden_boot.glb" scale={1.1} position={[0, 0, 0]} rotationSpeed={0.6} size={68} />
+                  </div>
+                  <span className="text-[7.5px] font-mono font-bold text-ink-mute tracking-wider mt-0.5 group-hover:text-gold transition-colors">GOLDEN BOOT</span>
+                </div>
+              )}
+              {winsGlove && (
+                <div
+                  onClick={() => setActiveAward({ key: "golden_glove", card })}
+                  className="flex flex-col items-center cursor-pointer group"
+                >
+                  <div className="group-hover:scale-110 active:scale-95 transition-transform duration-200">
+                    <Trophy3D modelPath="/3D-Models/golden_glove.glb" scale={1.2} position={[0, 0, 0]} rotationSpeed={0.6} size={68} />
+                  </div>
+                  <span className="text-[7.5px] font-mono font-bold text-ink-mute tracking-wider mt-0.5 group-hover:text-gold transition-colors">GOLDEN GLOVE</span>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
         <div
           style={{
             width: CARD_WIDTH,
@@ -674,6 +784,70 @@ export default function DuelView({
 
       <SupportProductHunt />
       <BuyMeACoffee />
+
+      {/* Award Details Modal */}
+      {activeAward && (() => {
+        const details = getAwardDetails(activeAward.key, activeAward.card);
+        return (
+          <div 
+            className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
+            onClick={() => setActiveAward(null)}
+          >
+            <div 
+              className="relative w-full max-w-[520px] rounded-3xl border border-white/10 bg-[#0b0930]/95 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.6)] animate-rise-soft flex flex-col sm:flex-row gap-4 sm:gap-6 items-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button 
+                className="absolute top-4 right-4 text-ink-mute hover:text-ink transition-colors font-sans text-lg z-10"
+                onClick={() => setActiveAward(null)}
+              >
+                ✕
+              </button>
+              
+              {/* Left Column: 3D model */}
+              <div className="flex-none flex justify-center items-center">
+                <Trophy3D 
+                  modelPath={details.model} 
+                  scale={
+                    activeAward.key === "world_cup" 
+                      ? details.scale * 1.6
+                      : activeAward.key === "golden_glove"
+                        ? details.scale * 1.8
+                        : details.scale * 2.2
+                  } 
+                  position={[0, 0, 0]}
+                  rotationSpeed={1.2}
+                  size={140}
+                />
+              </div>
+              
+              {/* Right Column: Description & stats */}
+              <div className="flex-1 text-center sm:text-left flex flex-col gap-2">
+                <h3 className="font-display text-2xl font-black tracking-wide text-gold-hi uppercase leading-tight">
+                  {details.title}
+                </h3>
+                
+                <div>
+                  <span 
+                    className="inline-block px-3 py-1 rounded-full border border-brand/20 bg-brand/10 text-[10px] font-mono font-bold text-brand uppercase tracking-wider"
+                  >
+                    {details.metricLabel}
+                  </span>
+                </div>
+                
+                <p className="mt-1 text-sm text-ink-soft leading-relaxed">
+                  {details.description}
+                </p>
+                
+                <div className="mt-3 pt-3 border-t border-white/5 flex justify-between items-center text-[11px] font-mono text-ink-mute">
+                  <span>QUALIFYING STAT</span>
+                  <span className="text-xs font-bold text-ink-dim">{details.value}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

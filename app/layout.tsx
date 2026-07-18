@@ -3,6 +3,7 @@ import { Bebas_Neue, Inter, JetBrains_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import { CustomPointer } from "@/components/CustomPointer";
 
 // Display — ultra-condensed all-caps for the WC26 "tournament" impact.
 const display = Bebas_Neue({
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${display.variable} ${sans.variable} ${mono.variable} ${dinCond.variable} ${dinBold.variable} ${dinMedium.variable} antialiased`}
     >
       <body>
+        <CustomPointer />
         {children}
         <Analytics />
       </body>

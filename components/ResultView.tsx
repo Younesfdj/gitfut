@@ -22,6 +22,7 @@ import { useReveal } from "@/hooks/useReveal";
 import { burstConfetti } from "@/lib/confetti";
 
 const HowItWorksModal = dynamic(() => import("./HowItWorksModal"), { ssr: false });
+const Trophy3D = dynamic(() => import("./Trophy3D"), { ssr: false });
 
 interface Props {
   card: Card;
@@ -50,6 +51,57 @@ export default function ResultView({
   const theme = resolveResultTheme(card);
   const phase = useReveal(card.finish);
   const [modalOpen, setModalOpen] = useState(false);
+  const [activeAward, setActiveAward] = useState<string | null>(null);
+
+  const hasWorldCup = card.overall >= 85;
+  const hasGoldenBoot = card.stats.sho >= 80;
+  const hasGoldenGlove = card.stats.def >= 60;
+
+  const AWARD_DETAILS: Record<string, {
+    title: string;
+    metricLabel: string;
+    description: string;
+    model: string;
+    scale: number;
+    value: string;
+  }> = {
+    world_cup: {
+      title: "World Cup Trophy",
+      metricLabel: "Generational Champion",
+      description: "The ultimate prize. Awarded to legendary champions whose overall rating reflects complete mastery across all aspects of software engineering.",
+      model: "/3D-Models/world_cup_trophy.glb",
+      scale: 0.65,
+      value: `OVR ${card.overall} (Requires >= 85)`
+    },
+    golden_boot: {
+      title: "Golden Boot",
+      metricLabel: "Elite Star Attraction",
+      description: "Awarded to players who demonstrate world-class shooting power by attracting massive stars across their repositories.",
+      model: "/3D-Models/golden_boot.glb",
+      scale: 0.5,
+      value: `SHO ${card.stats.sho} (Requires >= 80)`
+    },
+    golden_glove: {
+      title: "Golden Glove",
+      metricLabel: "Clean Sheet Defender",
+      description: "Awarded to the premier defenders of the codebase who keep the sheets clean through meticulous code reviews and issue resolutions.",
+      model: "/3D-Models/golden_glove.glb",
+      scale: 0.6,
+      value: `DEF ${card.stats.def} (Requires >= 60)`
+    }
+  };
+
+  // Close details modal on Escape key press
+  useEffect(() => {
+    if (!activeAward) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setActiveAward(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeAward]);
 
   // BACK when the visitor came from home this tab; otherwise (direct / shared
   // link) a CTA to make their own card. Default to the CTA so share-link
@@ -137,7 +189,8 @@ export default function ResultView({
       <div className="mt-[clamp(14px,2.4vh,26px)] grid grid-cols-[1fr_auto_1fr] items-start gap-[clamp(16px,2.4vw,40px)] max-[980px]:mt-6 max-[980px]:flex max-[980px]:flex-col max-[980px]:items-center">
         {/* left — attributes + playstyles */}
         <div className="flex justify-end max-[980px]:order-2 max-[980px]:w-full max-[980px]:max-w-[420px] max-[980px]:justify-center">
-          <div className="w-full max-w-[360px]">
+          <div className="w-full max-w-[360px] flex flex-col gap-[14px]">
+            <AwardsDisplayPanel card={card} onAwardClick={setActiveAward} />
             <AttributesPanel card={card} />
           </div>
         </div>
@@ -227,6 +280,125 @@ export default function ResultView({
     <BuyMeACoffee />
 
     {modalOpen && <HowItWorksModal onClose={() => setModalOpen(false)} />}
+
+    {/* Award Details Modal */}
+    {activeAward && (
+      <div 
+        className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
+        onClick={() => setActiveAward(null)}
+      >
+        <div 
+          className="relative w-full max-w-[520px] rounded-3xl border border-white/10 bg-[#0b0930]/95 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.6)] animate-rise-soft flex flex-col sm:flex-row gap-4 sm:gap-6 items-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button 
+            className="absolute top-4 right-4 text-ink-mute hover:text-ink transition-colors font-sans text-lg z-10"
+            onClick={() => setActiveAward(null)}
+          >
+            ✕
+          </button>
+          
+          {/* Left Column: 3D model (approx 30% width) */}
+          <div className="flex-none flex justify-center items-center">
+            <Trophy3D 
+              modelPath={AWARD_DETAILS[activeAward].model} 
+              scale={
+                activeAward === "world_cup" 
+                  ? AWARD_DETAILS[activeAward].scale * 1.6
+                  : activeAward === "golden_glove"
+                    ? AWARD_DETAILS[activeAward].scale * 1.8
+                    : AWARD_DETAILS[activeAward].scale * 2.2
+              } 
+              position={[0, 0, 0]}
+              rotationSpeed={1.2}
+              size={140}
+            />
+          </div>
+          
+          {/* Right Column: Description & stats (approx 70% width) */}
+          <div className="flex-1 text-center sm:text-left flex flex-col gap-2">
+            <h3 className="font-display text-2xl font-black tracking-wide text-gold-hi uppercase leading-tight">
+              {AWARD_DETAILS[activeAward].title}
+            </h3>
+            
+            <div>
+              <span 
+                className="inline-block px-3 py-1 rounded-full border border-brand/20 bg-brand/10 text-[10px] font-mono font-bold text-brand uppercase tracking-wider"
+              >
+                {AWARD_DETAILS[activeAward].metricLabel}
+              </span>
+            </div>
+            
+            <p className="mt-1 text-sm text-ink-soft leading-relaxed">
+              {AWARD_DETAILS[activeAward].description}
+            </p>
+            
+            <div className="mt-3 pt-3 border-t border-white/5 flex justify-between items-center text-[11px] font-mono text-ink-mute">
+              <span>QUALIFYING STAT</span>
+              <span className="text-xs font-bold text-ink-dim">{AWARD_DETAILS[activeAward].value}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
     </>
+  );
+}
+
+function AwardsDisplayPanel({
+  card,
+  onAwardClick,
+}: {
+  card: Card;
+  onAwardClick: (award: string) => void;
+}) {
+  const hasWorldCup = card.overall >= 85;
+  const hasGoldenBoot = card.stats.sho >= 80;
+  const hasGoldenGlove = card.stats.def >= 60;
+
+  if (!hasWorldCup && !hasGoldenBoot && !hasGoldenGlove) return null;
+
+  return (
+    <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-[16px] w-full flex flex-col gap-3">
+      <div className="mb-[2px] flex items-center gap-[9px]">
+        <span className="h-[2px] w-[16px] rounded-full bg-brand" />
+        <h3 className="font-display text-[11px] font-bold tracking-[.22em] text-ink-faint">ACHIEVED AWARDS</h3>
+      </div>
+      <div className="flex justify-center gap-2 mt-1 items-center">
+        {hasWorldCup && (
+          <div
+            onClick={() => onAwardClick("world_cup")}
+            className="flex flex-col items-center cursor-pointer group"
+          >
+            <div className="group-hover:scale-110 active:scale-95 transition-transform duration-200">
+              <Trophy3D modelPath="/3D-Models/world_cup_trophy.glb" scale={1.6} position={[0, 0, 0]} rotationSpeed={0.8} size={100} />
+            </div>
+            <span className="text-[9px] font-mono font-bold text-ink-mute tracking-wider mt-0.5 group-hover:text-gold transition-colors">WORLD CUP</span>
+          </div>
+        )}
+        {hasGoldenBoot && (
+          <div
+            onClick={() => onAwardClick("golden_boot")}
+            className="flex flex-col items-center cursor-pointer group"
+          >
+            <div className="group-hover:scale-110 active:scale-95 transition-transform duration-200">
+              <Trophy3D modelPath="/3D-Models/golden_boot.glb" scale={1.4} position={[0, 0, 0]} rotationSpeed={0.6} size={100} />
+            </div>
+            <span className="text-[9px] font-mono font-bold text-ink-mute tracking-wider mt-0.5 group-hover:text-gold transition-colors">GOLDEN BOOT</span>
+          </div>
+        )}
+        {hasGoldenGlove && (
+          <div
+            onClick={() => onAwardClick("golden_glove")}
+            className="flex flex-col items-center cursor-pointer group"
+          >
+            <div className="group-hover:scale-110 active:scale-95 transition-transform duration-200">
+              <Trophy3D modelPath="/3D-Models/golden_glove.glb" scale={1.5} position={[0, 0, 0]} rotationSpeed={0.6} size={100} />
+            </div>
+            <span className="text-[9px] font-mono font-bold text-ink-mute tracking-wider mt-0.5 group-hover:text-gold transition-colors">GOLDEN GLOVE</span>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
