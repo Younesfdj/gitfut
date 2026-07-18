@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ScoutForm from "@/components/ScoutForm";
-import CardFan from "@/components/CardFan";
+import Card3DScene from "@/components/Card3DScene";
 import LoadingScreen from "@/components/LoadingScreen";
 import dynamic from "next/dynamic";
 import FooterCredit from "@/components/FooterCredit";
@@ -67,7 +67,7 @@ export default function AppShell({
             onScout={handleScout}
             onOpenModal={() => setModalOpen(true)}
           />
-          <CardFan cards={SAMPLE_CARDS} onPick={handleScout} />
+          <Card3DScene cards={SAMPLE_CARDS} onPick={handleScout} />
         </div>
         <footer className="relative z-[2] mt-auto flex flex-none items-center justify-center p-[clamp(12px,2.6vh,24px)]">
           <FooterCredit />

@@ -49,6 +49,12 @@
   --animate-float: float 5s ease-in-out infinite;
   --animate-pop: pop 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-flag-raise: flag-raise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-hero-shimmer: hero-shimmer 2.8s ease-in-out 0.6s both;
+  --animate-float-orb: float-orb 22s ease-in-out infinite;
+  --animate-halo-breathe: halo-breathe 3s ease-in-out infinite;
+
+  /* Custom background utilities */
+  --gradient-radial: radial-gradient(var(--tw-gradient-stops));
 }
 
 @layer base {
@@ -376,6 +382,101 @@
   display: block;
 }
 
+/* ---- hero headline one-shot tier shimmer sweep ---- */
+@keyframes hero-shimmer {
+  0% {
+    background-position: 130% 0;
+  }
+  60%,
+  100% {
+    background-position: -30% 0;
+  }
+}
+
+/* ---- background floating orb drift ---- */
+@keyframes float-orb {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.12;
+  }
+  25% {
+    transform: translate(12%, -18%) scale(1.15);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translate(-8%, 6%) scale(0.9);
+    opacity: 0.1;
+  }
+  75% {
+    transform: translate(6%, 14%) scale(1.1);
+    opacity: 0.18;
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.12;
+  }
+}
+
+/* ---- loading screen mascot halo ---- */
+@keyframes halo-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.45;
+  }
+}
+
+/* ---- animated gradient border (input focus) ---- */
+@keyframes gradient-border {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* ---- loading bar tunnel glow ---- */
+@keyframes tunnel-glow {
+  0% {
+    transform: translateX(-120%);
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(360%);
+    opacity: 0.6;
+  }
+}
+
+/* ---- sleek scrollbar ---- */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(57, 211, 83, 0.2);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(57, 211, 83, 0.4);
+}
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(57, 211, 83, 0.2) transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -384,5 +485,36 @@
     animation-delay: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+/* Enhanced card hover utilities */
+@layer utilities {
+  .bg-gradient-radial {
+    background-image: radial-gradient(var(--tw-gradient-stops));
+  }
+  
+  /* Enhanced card glow effect */
+  .card-hover-glow {
+    box-shadow: 
+      0 0 20px rgba(57, 211, 83, 0.3),
+      0 0 40px rgba(57, 211, 83, 0.2),
+      0 0 60px rgba(57, 211, 83, 0.1);
+  }
+  
+  /* Shimmer animation for enhanced card effects */
+  .animate-enhanced-shimmer {
+    background-size: 200% 100%;
+    animation: enhanced-shimmer 1.5s ease-in-out infinite;
+  }
+}
+
+/* Enhanced shimmer keyframe */
+@keyframes enhanced-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
   }
 }

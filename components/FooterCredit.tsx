@@ -20,14 +20,24 @@ export default function FooterCredit() {
       .catch(() => {});
   }, []);
 
-  const link = "text-ink-dim underline-offset-2 transition hover:text-ink hover:underline";
+  const link = "text-ink-dim underline-offset-2 transition-all duration-200 hover:text-ink hover:underline hover:drop-shadow-[0_0_6px_rgba(57,211,83,.3)]";
 
   return (
-    <div className="relative inline-flex max-w-full items-center justify-center">
+    <div className="relative inline-flex max-w-full flex-col items-center justify-center gap-[10px]">
+      {/* thin gradient divider — brand green fading from center */}
+      <span
+        aria-hidden
+        className="pointer-events-none h-px w-[clamp(120px,40vw,280px)]"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, rgba(57,211,83,.35), transparent)",
+        }}
+      />
+
       {/* weak dark fade behind the credit — soft-edged, no hard pill outline */}
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-x-[-18px] inset-y-[-6px] rounded-full bg-bg-deep/70 blur-[10px]"
+        className="pointer-events-none absolute inset-x-[-18px] bottom-[-6px] top-[10px] rounded-full bg-bg-deep/70 blur-[10px]"
       />
 
       <div className="relative flex flex-wrap items-center justify-center gap-x-[clamp(3px,1.4vw,6px)] gap-y-[4px] text-[length:clamp(9px,2.7vw,13.5px)] font-semibold leading-none text-ink-soft">

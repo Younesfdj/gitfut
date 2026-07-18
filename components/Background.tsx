@@ -89,6 +89,47 @@ export default function Background() {
           background: "radial-gradient(60% 100% at 50% 100%, rgba(1,4,9,.85), transparent 72%)",
         }}
       />
+      {/* floating stadium-light orbs — subtle, blurred, slow-drifting particles
+           that give the deep-midnight background a living atmosphere. Each orb has
+           a different size/color/delay so they feel organic. */}
+      <div
+        className="animate-float-orb absolute"
+        style={{
+          top: "12%",
+          left: "18%",
+          width: "clamp(120px,18vw,260px)",
+          height: "clamp(120px,18vw,260px)",
+          borderRadius: "50%",
+          background: "radial-gradient(closest-side, rgba(57,211,83,.18), transparent 70%)",
+          filter: "blur(40px)",
+        }}
+      />
+      <div
+        className="animate-float-orb absolute"
+        style={{
+          top: "55%",
+          right: "10%",
+          width: "clamp(80px,12vw,180px)",
+          height: "clamp(80px,12vw,180px)",
+          borderRadius: "50%",
+          background: "radial-gradient(closest-side, rgba(212,175,55,.12), transparent 70%)",
+          filter: "blur(35px)",
+          animationDelay: "-8s",
+        }}
+      />
+      <div
+        className="animate-float-orb absolute"
+        style={{
+          top: "30%",
+          left: "60%",
+          width: "clamp(60px,10vw,140px)",
+          height: "clamp(60px,10vw,140px)",
+          borderRadius: "50%",
+          background: "radial-gradient(closest-side, rgba(86,224,107,.14), transparent 70%)",
+          filter: "blur(30px)",
+          animationDelay: "-15s",
+        }}
+      />
       {/* contribution-grid motif, faint along the bottom */}
       <div
         className="absolute bottom-0 left-0 right-0"
