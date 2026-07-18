@@ -130,9 +130,12 @@ export default function Background() {
           animationDelay: "-15s",
         }}
       />
-      {/* contribution-grid motif, faint along the bottom */}
+      {/* contribution-grid motif, faint along the bottom. Hidden below 980px:
+           narrow layouts stack content much taller than one viewport, so this
+           "floor" strip ends up floating behind mid-page content instead of
+           only at the true bottom. */}
       <div
-        className="absolute bottom-0 left-0 right-0"
+        className="absolute bottom-0 left-0 right-0 max-[980px]:hidden"
         style={{ height: "16%", opacity: 0.5, maskImage: "linear-gradient(to top, #000, transparent)", WebkitMaskImage: "linear-gradient(to top, #000, transparent)" }}
       >
         <ContribGrid />
