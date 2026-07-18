@@ -193,6 +193,14 @@ async function gql<T>(query: string, login: string, tok: PoolToken, retries = 1)
       benchToken(tok.idx, res.headers);
       return fail("ratelimit", "GitHub rate limit hit. Try again shortly.");
     }
+
+    if (body.errors && body.errors.length > 0) {
+      console.error("[github] GraphQL errors:", body.errors);
+      if (!body.errors.some(e => e.type === "NOT_FOUND")) {
+        return fail("network", body.errors[0].message || "GitHub API returned an error.");
+      }
+    }
+
     return { user: body.data?.user ?? null };
   }
   return fail("network", "GitHub request failed."); // unreachable; satisfies the type checker
