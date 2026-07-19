@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Card } from "@/lib/scoring/types";
+import { upsertCard } from "@/lib/scoutAsk/idb";
 
 const TTL = 3 * 60 * 60 * 1000;
 const cacheKey = (login: string) => `gitfut:card:${login.toLowerCase()}`;
@@ -16,13 +17,17 @@ function readCache(login: string): Card | null {
 }
 
 // Re-persist a card under its login (used when the flag is edited on the report,
-// so the chosen country survives a re-scout within the TTL).
+// so the chosen country survives a re-scout within the TTL). Also upserts into
+// the browser Scout Ask corpus (IndexedDB) so Ask recipes can filter it.
 export function writeCardCache(card: Card): void {
   try {
     localStorage.setItem(cacheKey(card.login), JSON.stringify({ t: Date.now(), card }));
   } catch {
     /* quota / private mode */
   }
+  void upsertCard(card).catch(() => {
+    /* IndexedDB unavailable */
+  });
 }
 
 export function useScout() {
@@ -60,7 +65,7 @@ export function useScout() {
 
   // Edit the current card's flag in place (from the report-page picker) and
   // persist it so a re-scout within the TTL keeps the choice. The cache write is
-  // kept out of the setState updater (updaters must stay pure) — `card` is the
+  // kept out of the setState updater (updaters must stay pure) - `card` is the
   // current value from the render this handler closed over.
   const setCountry = (code: string) => {
     if (!card) return;
