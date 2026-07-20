@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Volume2, VolumeX } from "lucide-react";
 import type { Card } from "@/lib/scoring/types";
 import PlayerCard from "./PlayerCard";
 import TiltCard from "./TiltCard";
@@ -20,6 +20,7 @@ import DistributionPanel from "./DistributionPanel";
 import { confettiPalette, resolveCardTheme, resolveResultTheme } from "./finishTheme";
 import { useReveal } from "@/hooks/useReveal";
 import { burstConfetti } from "@/lib/confetti";
+import { isMuted, playRevealChime, setMuted } from "@/lib/sound";
 
 const HowItWorksModal = dynamic(() => import("./HowItWorksModal"), { ssr: false });
 
@@ -70,6 +71,26 @@ export default function ResultView({
   useEffect(() => {
     if (phase === "burst") burstConfetti(confettiPalette(card));
   }, [phase, card]);
+
+  // Reveal chime: a small "pop" on ignite for common tiers, a brighter arpeggio
+  // on burst for rare ones (same tier split as the confetti above).
+  useEffect(() => {
+    if (phase === "ignite") playRevealChime(card.finish, false);
+    if (phase === "burst") playRevealChime(card.finish, true);
+  }, [phase, card]);
+
+  const [muted, setMutedState] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMutedState(isMuted()), 0);
+    return () => clearTimeout(t);
+  }, []);
+  const toggleMuted = () => {
+    setMutedState((prev) => {
+      const next = !prev;
+      setMuted(next);
+      return next;
+    });
+  };
 
   const ignited = phase === "ignite" || phase === "burst" || phase === "freeze";
 
@@ -125,6 +146,15 @@ export default function ResultView({
             className="cursor-pointer text-[12.5px] font-semibold text-ink-soft underline-offset-2 transition hover:text-brand hover:underline max-[420px]:hidden"
           >
             how it works ↗
+          </button>
+          <button
+            type="button"
+            onClick={toggleMuted}
+            aria-label={muted ? "Unmute reveal sound" : "Mute reveal sound"}
+            aria-pressed={muted}
+            className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full border border-line bg-bg-deep/55 text-ink-soft backdrop-blur-md transition hover:border-ink-mute hover:bg-bg-deep/80 hover:text-ink"
+          >
+            {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
           </button>
           <GithubStar stars={stars ?? null} />
         </div>
