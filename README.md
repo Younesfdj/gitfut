@@ -66,6 +66,18 @@ Every card walks out in a finish:
 
 <br/>
 
+## 🏆 &nbsp;Achievements & Awards
+
+Developers can earn premium 3D trophies that display directly on their profile page and duel views. Clicking on any trophy opens an interactive modal to view details and qualifying statistics:
+
+| Award | 3D Model | Qualification Criteria |
+| :---: | :--- | :--- |
+| **World Cup Trophy** | `/3D-Models/world_cup_trophy.glb` | **Generational Champion**: Earned by achieving an Overall rating of **85 or higher**, reflecting complete mastery. In duels, awarded to the overall match winner (or both in case of a draw). |
+| **Golden Boot** | `/3D-Models/golden_boot.glb` | **Elite Star Attraction**: Earned by achieving a Shooting (`SHO`) stat of **80 or higher** (representing stellar repo star metrics). In duels, awarded to the player who wins the SHO category (or both in a tie). |
+| **Golden Glove** | `/3D-Models/golden_glove.glb` | **Clean Sheet Defender**: Earned by achieving a Defending (`DEF`) stat of **60 or higher** (representing outstanding code reviews and issues closed). In duels, awarded to the player who wins the DEF category (or both in a tie). |
+
+<br/>
+
 <div align="center">
 
 **Built with** Next.js · TypeScript · Tailwind · Redis

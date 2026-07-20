@@ -1,6 +1,10 @@
+"use client";
+
 const noiseSvg =
   '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2"/></filter><rect width="120" height="120" filter="url(#n)"/></svg>';
 const NOISE = `url("data:image/svg+xml;utf8,${encodeURIComponent(noiseSvg)}")`;
+
+
 
 // Faint GitHub-contribution-grid motif — a brand signature drawn into the
 // backdrop. A few cells gently pulse green (see .gf-grid-cell in globals.css).
