@@ -1,0 +1,26 @@
+{
+  "world_cup": {
+    "frames": 96,
+    "cols": 10,
+    "size": 320,
+    "fps": 12
+  },
+  "golden_boot": {
+    "frames": 96,
+    "cols": 10,
+    "size": 320,
+    "fps": 12
+  },
+  "golden_glove": {
+    "frames": 96,
+    "cols": 10,
+    "size": 320,
+    "fps": 12
+  },
+  "ball": {
+    "frames": 126,
+    "cols": 12,
+    "size": 160,
+    "fps": 20
+  }
+}

@@ -3,6 +3,7 @@ import { Bebas_Neue, Inter, JetBrains_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import Script from "next/script";
 import "./globals.css";
+import BallCursor from "@/components/BallCursor";
 
 // Display — ultra-condensed all-caps for the WC26 "tournament" impact.
 const display = Bebas_Neue({
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${display.variable} ${sans.variable} ${mono.variable} ${dinCond.variable} ${dinBold.variable} ${dinMedium.variable} antialiased`}
     >
       <body>
+        <BallCursor />
         {children}
         <Script
           defer

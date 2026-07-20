@@ -66,6 +66,18 @@ Every card walks out in a finish:
 
 <br/>
 
+## 🏆 &nbsp;Achievements & Awards
+
+Standout cards earn trophies, shown on the scout report and carried into duels like a boxer's belts — a duel showcases what each player brings, it never awards anything itself. Click a trophy for its story and your qualifying stat. Rendered from pre-baked rotating sprites (no 3D runtime — see `scripts/bake-award-sprites.ts`):
+
+| Award | Earned by |
+| :---: | :--- |
+| **World Cup Trophy** | **Generational Champion** — Overall rating of **85+**, complete mastery across the board. |
+| **Golden Boot** | **Elite Star Attraction** — Shooting (`SHO`) of **80+**, stellar repo star power. |
+| **Golden Glove** | **Clean Sheet Defender** — Defending (`DEF`) of **60+**, outstanding reviews and issues closed. |
+
+<br/>
+
 <div align="center">
 
 **Built with** Next.js · TypeScript · Tailwind · Redis

@@ -17,6 +17,9 @@ import GithubStar from "./GithubStar";
 import dynamic from "next/dynamic";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
 import DistributionPanel from "./DistributionPanel";
+import AwardModal from "./AwardModal";
+import TrophySprite from "./TrophySprite";
+import { earnedAwards, type Award } from "@/lib/awards";
 import { confettiPalette, resolveCardTheme, resolveResultTheme } from "./finishTheme";
 import { useReveal } from "@/hooks/useReveal";
 import { burstConfetti } from "@/lib/confetti";
@@ -50,6 +53,7 @@ export default function ResultView({
   const theme = resolveResultTheme(card);
   const phase = useReveal(card.finish);
   const [modalOpen, setModalOpen] = useState(false);
+  const [activeAward, setActiveAward] = useState<Award | null>(null);
 
   // BACK when the visitor came from home this tab; otherwise (direct / shared
   // link) a CTA to make their own card. Default to the CTA so share-link
@@ -137,7 +141,8 @@ export default function ResultView({
       <div className="mt-[clamp(14px,2.4vh,26px)] grid grid-cols-[1fr_auto_1fr] items-start gap-[clamp(16px,2.4vw,40px)] max-[980px]:mt-6 max-[980px]:flex max-[980px]:flex-col max-[980px]:items-center">
         {/* left — attributes + playstyles */}
         <div className="flex justify-end max-[980px]:order-2 max-[980px]:w-full max-[980px]:max-w-[420px] max-[980px]:justify-center">
-          <div className="w-full max-w-[360px]">
+          <div className="w-full max-w-[360px] flex flex-col gap-[14px]">
+            <AwardsDisplayPanel card={card} onAwardClick={setActiveAward} />
             <AttributesPanel card={card} />
           </div>
         </div>
@@ -227,6 +232,48 @@ export default function ResultView({
     <BuyMeACoffee />
 
     {modalOpen && <HowItWorksModal onClose={() => setModalOpen(false)} />}
+
+    {activeAward && (
+      <AwardModal award={activeAward} card={card} onClose={() => setActiveAward(null)} />
+    )}
     </>
+  );
+}
+
+function AwardsDisplayPanel({
+  card,
+  onAwardClick,
+}: {
+  card: Card;
+  onAwardClick: (award: Award) => void;
+}) {
+  const earned = earnedAwards(card);
+  if (earned.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-[16px] w-full flex flex-col gap-3">
+      <div className="mb-[2px] flex items-center gap-[9px]">
+        <span className="h-[2px] w-[16px] rounded-full bg-brand" />
+        <h3 className="font-display text-[11px] font-bold tracking-[.22em] text-ink-faint">ACHIEVED AWARDS</h3>
+      </div>
+      <div className="flex justify-center gap-2 mt-1 items-center">
+        {earned.map((award) => (
+          <button
+            key={award.key}
+            type="button"
+            onClick={() => onAwardClick(award)}
+            aria-label={`${award.title} details`}
+            className="flex flex-col items-center cursor-pointer group"
+          >
+            <div className="group-hover:scale-110 active:scale-95 transition-transform duration-200">
+              <TrophySprite sprite={award.key} size={100} />
+            </div>
+            <span className="text-[9px] font-mono font-bold text-ink-mute tracking-wider mt-0.5 group-hover:text-gold transition-colors">
+              {award.shelfLabel}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
