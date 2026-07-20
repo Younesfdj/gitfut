@@ -16,8 +16,22 @@ import { tokenPool, pickToken, pickFailover, recordTokenHealth, benchToken, type
 // many windows share a request, so we fetch the profile in one fast query, then
 // the years in small parallel batches with a retry — and tolerate a dropped
 // batch (the figure is only used log-scaled, so a missing year barely moves it).
+//
+// GitHub also rejects contributionsCollection outright (RESOURCE_LIMITS_EXCEEDED)
+// when the window holds too many contribution events — measured mid-2026 at
+// roughly 2k events per REQUEST, regardless of which fields are selected, and
+// regardless of aliasing (two windows in one request pool their cost). Only
+// hyperactive profiles trip it, but for them the one-shot profile query dies —
+// so fetchProfile falls back to rebuilding the same payload from date-windowed
+// slices, each small enough to fit the budget (see fetchProfileWindowed).
 
-export type GithubErrorType = "invalid" | "notfound" | "ratelimit" | "network" | "config";
+export type GithubErrorType =
+  | "invalid"
+  | "notfound"
+  | "resource"
+  | "ratelimit"
+  | "network"
+  | "config";
 
 export interface GithubError {
   type: GithubErrorType;
@@ -120,7 +134,9 @@ interface UserNode {
         primaryLanguage: { name: string } | null;
       };
     }[];
-    contributionCalendar: { weeks: { contributionDays: { contributionCount: number }[] }[] };
+    contributionCalendar: {
+      weeks: { contributionDays: { contributionCount: number }[] }[];
+    };
   };
 }
 
@@ -136,7 +152,12 @@ interface YearContrib {
 // not found, rate limit) throw a GithubError; success returns the user node.
 // Every response's rate-limit headers feed the token-health record; a limited
 // response additionally benches the token so failover skips it.
-async function gql<T>(query: string, login: string, tok: PoolToken, retries = 1): Promise<{ user: T | null }> {
+async function gql<T>(
+  query: string,
+  login: string,
+  tok: PoolToken,
+  retries = 1,
+): Promise<{ user: T | null }> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     let res: Response;
     const ctrl = new AbortController();
@@ -144,7 +165,10 @@ async function gql<T>(query: string, login: string, tok: PoolToken, retries = 1)
     try {
       res = await fetch(ENDPOINT, {
         method: "POST",
-        headers: { Authorization: `Bearer ${tok.token}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${tok.token}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ query, variables: { login } }),
         signal: ctrl.signal,
       });
@@ -193,6 +217,24 @@ async function gql<T>(query: string, login: string, tok: PoolToken, retries = 1)
       benchToken(tok.idx, res.headers);
       return fail("ratelimit", "GitHub rate limit hit. Try again shortly.");
     }
+    // A GraphQL error with data.user null is NOT "no such user" unless GitHub
+    // says so (NOT_FOUND). Anything else was collapsing real errors — resource
+    // limits above all — into a false "notfound" (issue #79).
+    if (body.errors?.length && !body.data?.user) {
+      if (body.errors.every((e) => e.type === "NOT_FOUND"))
+        return { user: null };
+      if (body.errors.some((e) => e.type === "RESOURCE_LIMITS_EXCEEDED"))
+        return fail(
+          "resource",
+          "This profile's contribution history is too heavy for one query.",
+        );
+      return fail(
+        "network",
+        body.errors[0]?.message ?? "GitHub returned a GraphQL error.",
+      );
+    }
+    // Field-level errors alongside a usable user node are a partial success —
+    // keep the data.
     return { user: body.data?.user ?? null };
   }
   return fail("network", "GitHub request failed."); // unreachable; satisfies the type checker
@@ -228,7 +270,170 @@ function profileQuery(): string {
     }`;
 }
 
-function lifetimeQuery(years: number[], currentYear: number, nowIso: string): string {
+type RecentNode = UserNode["recent"];
+type BasicsNode = Omit<UserNode, "recent">;
+
+// The last 365 days, same span the default contributionsCollection covers.
+const RECENT_YEAR_MS = 365 * 86_400_000;
+// How many times a failing window may halve. 2 splits from the half-year
+// starting windows = ~46-day slices; a profile still over budget at that width
+// (~16k+ events/yr, bot territory) degrades that slice to zeros, best-effort —
+// the same philosophy fetchLifetime already applies to dropped batches.
+const RECENT_WINDOW_SPLITS = 2;
+
+// profileQuery() minus contributionsCollection — everything that stays cheap
+// for hyperactive profiles (repositories cost is bounded by first: 100).
+function basicsQuery(): string {
+  return `
+    query Basics($login: String!) {
+      user(login: $login) {
+        login
+        name
+        avatarUrl(size: 480)
+        location
+        createdAt
+        followers { totalCount }
+        repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
+          totalCount
+          nodes { nameWithOwner stargazerCount primaryLanguage { name } createdAt pushedAt }
+        }
+      }
+    }`;
+}
+
+// One date-bounded slice of the recent-contributions block, same fields the
+// one-shot query selects. from/to are inlined (gql only posts $login).
+function recentWindowQuery(fromIso: string, toIso: string): string {
+  return `
+    query RecentWindow($login: String!) {
+      user(login: $login) {
+        recent: contributionsCollection(from: "${fromIso}", to: "${toIso}") {
+          totalCommitContributions
+          totalPullRequestContributions
+          totalPullRequestReviewContributions
+          totalIssueContributions
+          restrictedContributionsCount
+          commitContributionsByRepository(maxRepositories: 100) {
+            contributions { totalCount }
+            repository { nameWithOwner isFork isPrivate primaryLanguage { name } }
+          }
+          contributionCalendar { weeks { contributionDays { contributionCount } } }
+        }
+      }
+    }`;
+}
+
+function emptyRecent(): RecentNode {
+  return {
+    totalCommitContributions: 0,
+    totalPullRequestContributions: 0,
+    totalPullRequestReviewContributions: 0,
+    totalIssueContributions: 0,
+    restrictedContributionsCount: 0,
+    commitContributionsByRepository: [],
+    contributionCalendar: { weeks: [] },
+  };
+}
+
+// Disjoint windows sum cleanly: totals add, per-repo commit counts merge by
+// repo (so normalize's ≥3-commit language threshold sees the year's real
+// total), calendars concatenate — a boundary day appears in both windows'
+// calendars but with its count in exactly one, so active-day counting stays
+// correct.
+function combineRecent(parts: RecentNode[]): RecentNode {
+  const out = emptyRecent();
+  const byRepo = new Map<
+    string,
+    RecentNode["commitContributionsByRepository"][number]
+  >();
+  for (const p of parts) {
+    out.totalCommitContributions += p.totalCommitContributions;
+    out.totalPullRequestContributions += p.totalPullRequestContributions;
+    out.totalPullRequestReviewContributions +=
+      p.totalPullRequestReviewContributions;
+    out.totalIssueContributions += p.totalIssueContributions;
+    out.restrictedContributionsCount += p.restrictedContributionsCount;
+    out.contributionCalendar.weeks.push(...p.contributionCalendar.weeks);
+    for (const c of p.commitContributionsByRepository ?? []) {
+      const seen = byRepo.get(c.repository.nameWithOwner);
+      if (seen) seen.contributions.totalCount += c.contributions.totalCount;
+      else
+        byRepo.set(c.repository.nameWithOwner, {
+          contributions: { totalCount: c.contributions.totalCount },
+          repository: c.repository,
+        });
+    }
+  }
+  out.commitContributionsByRepository = [...byRepo.values()];
+  return out;
+}
+
+// One window of recent contributions; on a resource rejection, halve and
+// recurse (both halves in parallel) until the budget fits or splits run out.
+async function fetchRecentWindow(
+  login: string,
+  tok: PoolToken,
+  from: Date,
+  to: Date,
+  splitsLeft: number,
+): Promise<RecentNode> {
+  try {
+    const { user } = await gql<{ recent: RecentNode }>(
+      recentWindowQuery(from.toISOString(), to.toISOString()),
+      login,
+      tok,
+    );
+    return user?.recent ?? emptyRecent();
+  } catch (e) {
+    if ((e as GithubError).type !== "resource") throw e;
+    if (splitsLeft === 0) return emptyRecent(); // over budget at the floor — zeros beat no card
+    const mid = new Date((from.getTime() + to.getTime()) / 2);
+    const halves = await Promise.all([
+      fetchRecentWindow(login, tok, from, mid, splitsLeft - 1),
+      fetchRecentWindow(
+        login,
+        tok,
+        new Date(mid.getTime() + 1),
+        to,
+        splitsLeft - 1,
+      ),
+    ]);
+    return combineRecent(halves);
+  }
+}
+
+// Resource-limit fallback: the profile basics in one cheap query, plus the
+// last year's contributions rebuilt from date-windowed slices. Two half-year
+// windows suffice for the profiles seen in the wild (~2.3k events/yr); the
+// split ladder in fetchRecentWindow absorbs heavier ones. Total cost for a
+// typical affected profile: 3 requests, one round-trip deep.
+async function fetchProfileWindowed(
+  login: string,
+  tok: PoolToken,
+  now: Date,
+): Promise<UserNode | null> {
+  const { user } = await gql<BasicsNode>(basicsQuery(), login, tok);
+  if (!user) return null;
+  const from = new Date(now.getTime() - RECENT_YEAR_MS);
+  const mid = new Date(now.getTime() - RECENT_YEAR_MS / 2);
+  const halves = await Promise.all([
+    fetchRecentWindow(login, tok, from, mid, RECENT_WINDOW_SPLITS),
+    fetchRecentWindow(
+      login,
+      tok,
+      new Date(mid.getTime() + 1),
+      now,
+      RECENT_WINDOW_SPLITS,
+    ),
+  ]);
+  return { ...user, recent: combineRecent(halves) };
+}
+
+function lifetimeQuery(
+  years: number[],
+  currentYear: number,
+  nowIso: string,
+): string {
   const aliases = years
     .map((y) => {
       const to = y === currentYear ? nowIso : `${y}-12-31T23:59:59Z`;
@@ -249,6 +454,13 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+const sumContrib = (c: YearContrib) =>
+  c.totalCommitContributions +
+  c.totalIssueContributions +
+  c.totalPullRequestContributions +
+  c.totalPullRequestReviewContributions +
+  c.restrictedContributionsCount;
+
 // Sum of every year's contributions (commits + issues + PRs + reviews + private).
 // Each batch is best-effort: a batch that fails after its retry contributes 0
 // rather than failing the scout.
@@ -262,37 +474,44 @@ async function fetchLifetime(
   const years: number[] = [];
   for (let y = Math.max(createdYear, GITHUB_EPOCH_YEAR); y <= currentYear; y++) years.push(y);
 
+  const yearsTotal = async (batch: number[]): Promise<number> => {
+    const { user } = await gql<Record<string, YearContrib | null>>(
+      lifetimeQuery(batch, currentYear, nowIso),
+      login,
+      tok,
+    );
+    if (!user) return 0;
+    return batch.reduce((s, y) => {
+      const c = user[`y${y}`];
+      return c ? s + sumContrib(c) : s;
+    }, 0);
+  };
+
   const sums = await Promise.all(
     chunk(years, LIFETIME_BATCH).map(async (batch) => {
       try {
-        const { user } = await gql<Record<string, YearContrib | null>>(
-          lifetimeQuery(batch, currentYear, nowIso),
-          login,
-          tok,
-        );
-        if (!user) return 0;
-        return batch.reduce((s, y) => {
-          const c = user[`y${y}`];
-          return c
-            ? s +
-                c.totalCommitContributions +
-                c.totalIssueContributions +
-                c.totalPullRequestContributions +
-                c.totalPullRequestReviewContributions +
-                c.restrictedContributionsCount
-            : s;
-        }, 0);
+        return await yearsTotal(batch);
       } catch {
-        return 0;
+        // Aliased years pool their resource cost, so one hyperactive year sinks
+        // its whole batch — retry each year alone (own request, own budget) and
+        // let only the truly over-budget years degrade to 0.
+        const singles = await Promise.all(
+          batch.map((y) => yearsTotal([y]).catch(() => 0)),
+        );
+        return singles.reduce((a, b) => a + b, 0);
       }
     }),
   );
   return sums.reduce((a, b) => a + b, 0);
 }
 
-export async function fetchProfile(username: string, now = new Date()): Promise<RawPayload> {
+export async function fetchProfile(
+  username: string,
+  now = new Date(),
+): Promise<RawPayload> {
   const login = username.trim().replace(/^@/, "");
-  if (!VALID.test(login)) return fail("invalid", "That doesn't look like a GitHub username.");
+  if (!VALID.test(login))
+    return fail("invalid", "That doesn't look like a GitHub username.");
 
   const pool = tokenPool();
   if (!pool.length) return fail("config", "Server is missing a GitHub token.");
@@ -301,9 +520,21 @@ export async function fetchProfile(username: string, now = new Date()): Promise<
   // query below so a user's profile + lifetime batches never straddle tokens.
   let tok = pickToken(login, pool) as PoolToken;
 
+  // The one-shot profile query, degrading to the windowed rebuild when GitHub's
+  // resource limits reject it for a hyperactive profile.
+  const fetchUser = async (t: PoolToken): Promise<UserNode | null> => {
+    try {
+      const { user } = await gql<UserNode>(profileQuery(), login, t);
+      return user;
+    } catch (e) {
+      if ((e as GithubError).type !== "resource") throw e;
+      return fetchProfileWindowed(login, t, now);
+    }
+  };
+
   let user: UserNode | null;
   try {
-    ({ user } = await gql<UserNode>(profileQuery(), login, tok));
+    user = await fetchUser(tok);
   } catch (e) {
     // Only a rate limit is cured by another token (a timeout or 5xx would just
     // fail again) — retry once on the healthiest token, if the pool has one.
@@ -311,12 +542,18 @@ export async function fetchProfile(username: string, now = new Date()): Promise<
     const fallback = await pickFailover(tok.idx, pool);
     if (!fallback) throw e; // every other token is benched too
     tok = fallback;
-    ({ user } = await gql<UserNode>(profileQuery(), login, tok));
+    user = await fetchUser(tok);
   }
   if (!user) return fail("notfound", "No GitHub user by that name.");
 
   const createdYear = new Date(user.createdAt).getUTCFullYear();
-  const lifetimeContributions = await fetchLifetime(login, tok, createdYear, now.getUTCFullYear(), now.toISOString());
+  const lifetimeContributions = await fetchLifetime(
+    login,
+    tok,
+    createdYear,
+    now.getUTCFullYear(),
+    now.toISOString(),
+  );
 
   return normalize(user, lifetimeContributions);
 }

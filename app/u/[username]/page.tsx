@@ -31,7 +31,10 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
 
 function NotScouted({ username, error }: { username: string; error: GithubError }) {
   const rateLimited = error.type === "ratelimit";
-  const heading = rateLimited ? "The scouts are gassed" : "No file found";
+  // "No file found" is reserved for errors that are about the USERNAME
+  // (missing or impossible); a GitHub-side failure must not blame the user.
+  const noSuchUser = error.type === "notfound" || error.type === "invalid";
+  const heading = rateLimited ? "The scouts are gassed" : noSuchUser ? "No file found" : "Scouting interrupted";
   const message = rateLimited
     ? `You lot went viral and stormed the training ground all at once — GitHub just showed us a yellow card for time-wasting. Give the scouts a couple minutes to catch their breath, then send @${username} back on.`
     : error.type === "notfound"

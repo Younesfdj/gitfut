@@ -101,4 +101,16 @@ describe("searchCountries", () => {
   it("returns empty for a query that matches nothing", () => {
     expect(searchCountries("qqqq")).toEqual([]);
   });
+
+  // Renamed countries (issue #85): current names display, retired names still search.
+  it("shows current names for renamed countries and keeps the old names findable", () => {
+    expect(countryName("mk")).toBe("North Macedonia");
+    expect(countryName("sz")).toBe("Eswatini");
+    // "macedonia" matches the new name by substring; "swaziland" only via alias.
+    expect(searchCountries("macedonia").map((c) => c.code)).toContain("mk");
+    expect(searchCountries("swaziland").map((c) => c.code)).toContain("sz");
+    expect(searchCountries("swazi")[0]?.code).toBe("sz");
+    // The alias is search-only — no result ever displays the retired name.
+    for (const c of searchCountries("swaziland")) expect(c.name).not.toBe("Swaziland");
+  });
 });

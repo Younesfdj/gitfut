@@ -536,7 +536,7 @@ const GENERATED: readonly Country[] = [
   },
   {
     "code": "mk",
-    "name": "Macedonia, the former Yugoslav Republic of"
+    "name": "North Macedonia"
   },
   {
     "code": "mg",
@@ -864,7 +864,7 @@ const GENERATED: readonly Country[] = [
   },
   {
     "code": "sz",
-    "name": "Swaziland"
+    "name": "Eswatini"
   },
   {
     "code": "se",
@@ -1047,10 +1047,16 @@ export function countryName(code: string | null | undefined): string | null {
   return BY_CODE.get(code.toLowerCase())?.name ?? null;
 }
 
+// Search-only aliases: retired names people still type. Never displayed —
+// the picker shows the current name; this only keeps it findable.
+const SEARCH_ALIASES: Record<string, readonly string[]> = {
+  sz: ["swaziland"], // renamed Eswatini in 2018
+};
+
 /**
- * Filter countries by a free-text query, matched against name and code.
- * Empty query returns the full list. Prefix matches rank above substring
- * matches so typing "ge" surfaces Georgia/Germany before Algeria.
+ * Filter countries by a free-text query, matched against name, code and
+ * retired-name aliases. Empty query returns the full list. Prefix matches rank
+ * above substring matches so typing "ge" surfaces Georgia/Germany before Algeria.
  */
 export function searchCountries(query: string): readonly Country[] {
   const q = query.trim().toLowerCase();
@@ -1058,9 +1064,9 @@ export function searchCountries(query: string): readonly Country[] {
   const starts: Country[] = [];
   const contains: Country[] = [];
   for (const c of COUNTRIES) {
-    const name = c.name.toLowerCase();
-    if (name.startsWith(q) || c.code === q) starts.push(c);
-    else if (name.includes(q) || c.code.startsWith(q)) contains.push(c);
+    const names = [c.name.toLowerCase(), ...(SEARCH_ALIASES[c.code] ?? [])];
+    if (names.some((n) => n.startsWith(q)) || c.code === q) starts.push(c);
+    else if (names.some((n) => n.includes(q)) || c.code.startsWith(q)) contains.push(c);
   }
   return [...starts, ...contains];
 }
