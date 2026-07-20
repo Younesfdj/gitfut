@@ -97,7 +97,7 @@ function AttributeRow({ label, children }: { label: string; children: React.Reac
 
 // Editorial section: an accent dash + tracked label, then content — reads as a
 // scouting-report section rather than a dashboard card.
-function Section({
+export function Section({
   title,
   accent,
   className,

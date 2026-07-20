@@ -20,6 +20,8 @@ import DistributionPanel from "./DistributionPanel";
 import { confettiPalette, resolveCardTheme, resolveResultTheme } from "./finishTheme";
 import { useReveal } from "@/hooks/useReveal";
 import { burstConfetti } from "@/lib/confetti";
+import PlayerNumber from "./PlayerNumber";
+
 
 const HowItWorksModal = dynamic(() => import("./HowItWorksModal"), { ssr: false });
 
@@ -189,11 +191,12 @@ export default function ResultView({
           </div>
         </div>
 
-        {/* right — scouting metrics + distribution */}
+        {/* right — scouting metrics + squad number + distribution */}
         <div className="flex max-[980px]:order-3 max-[980px]:w-full max-[980px]:max-w-[420px] max-[980px]:justify-center">
           <div className="flex w-full max-w-[360px] flex-col gap-[14px]">
             <MetricsPanel card={card} />
             <DistributionPanel card={card} />
+            <PlayerNumber card={card} />
           </div>
         </div>
       </div>

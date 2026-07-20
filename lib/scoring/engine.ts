@@ -3,6 +3,8 @@ import { topLanguageLogo } from "../github/languages";
 import { deriveMetrics, deriveSkillMoves, deriveStyle, deriveWeakFoot, deriveWorkRate } from "./attributes";
 import { ATTACK_STATS, FINISH_LABELS, FOUNDER_OVERALL, FOUNDERS, K, STATS, WEIGHTS } from "./constants";
 import { derivePlaystyles } from "./playstyles";
+import { generateSquadNumber } from "./squadNumber";
+
 import type {
   Archetype,
   Card,
@@ -212,6 +214,7 @@ export function buildCard(s: Signals): Card {
     languageLogo,
     ...(founder ? { founder } : null),
     legacy: { L },
+    squadNumber: generateSquadNumber(s.login, position, overall),
     report: {
       skillMoves: skill.value,
       weakFoot: weak.value,
