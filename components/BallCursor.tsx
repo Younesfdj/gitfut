@@ -37,16 +37,21 @@ export default function BallCursor() {
   const posRef = useRef({ x: 0, y: 0 }); // ball center, carried across phases
 
   // Mount only on sure-desktops; if the environment stops qualifying mid-play
-  // (window shrunk, device emulation), drop straight back to nothing.
+  // (window shrunk, device emulation), drop straight back to nothing. Initial
+  // sync is deferred (house pattern, see ResultView's seenHome) so the set
+  // can't cascade a render.
   useEffect(() => {
     const mq = window.matchMedia(DESKTOP_MQ);
-    setDesktop(mq.matches);
-    const onChange = () => {
+    const sync = () => {
       setDesktop(mq.matches);
       if (!mq.matches) setPhase("idle");
     };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    const t = setTimeout(sync, 0);
+    mq.addEventListener("change", sync);
+    return () => {
+      clearTimeout(t);
+      mq.removeEventListener("change", sync);
+    };
   }, []);
 
   // Dribble: eased chase after the pointer (ease-out feel — fast when far,
@@ -58,6 +63,7 @@ export default function BallCursor() {
     document.documentElement.classList.add("gf-ball-cursor");
 
     let { x, y } = posRef.current;
+    el.style.transform = `translate3d(${x - SIZE / 2}px, ${y - SIZE / 2}px, 0)`;
     let mx = x;
     let my = y;
     let overClickable = false;
@@ -137,13 +143,14 @@ export default function BallCursor() {
   if (!desktop) return null;
 
   if (phase !== "idle") {
-    const { x, y } = posRef.current;
+    // Positioned by the phase effects via el.style.transform (refs can't be
+    // read during render); until then the transform below keeps it offscreen.
     return (
       <div
         ref={ballRef}
         aria-hidden
-        className="pointer-events-none fixed left-0 top-0 z-[999] will-change-transform"
-        style={{ ...frameStyle, width: SIZE, height: SIZE, transform: `translate3d(${x - SIZE / 2}px, ${y - SIZE / 2}px, 0)` }}
+        className="pointer-events-none fixed left-0 top-0 z-[999] -translate-x-full -translate-y-full will-change-transform"
+        style={{ ...frameStyle, width: SIZE, height: SIZE }}
       />
     );
   }
