@@ -32,6 +32,7 @@ const payload = (over: Partial<RawPayload> = {}): RawPayload => ({
   recentRestricted: 0,
   recentActiveDays: 0,
   lifetimeContributions: 0,
+  activeYears: 0,
   ...over,
 });
 
@@ -84,5 +85,57 @@ describe("signalsFromPayload — language diversity", () => {
     expect(s.languages).toBe(0);
     expect(s.rankedLanguages).toEqual([]);
     expect(s.topLanguage).toBeNull();
+  });
+});
+
+describe("signalsFromPayload — active contribution years", () => {
+  const yearsFrom = (start: number, end: number) =>
+    Array.from({ length: end - start + 1 }, (_, index) => start + index);
+
+  it("uses annual contribution activity instead of owned-repository dates", () => {
+    const contributionYears = yearsFrom(2021, 2026);
+    const ownedRepoYears = new Set([contributionYears[0], ...contributionYears.slice(-3)]);
+    const repos = [...ownedRepoYears].map((year) =>
+      repo({
+        createdAt: `${year}-01-01T00:00:00Z`,
+        pushedAt: `${year}-12-01T00:00:00Z`,
+      }),
+    );
+
+    const s = signalsFromPayload(payload({ repos, activeYears: contributionYears.length }), NOW);
+
+    expect(s.active_years).toBe(contributionYears.length);
+    expect(s.active_years).not.toBe(ownedRepoYears.size);
+  });
+
+  it("preserves zero when GitHub reports no active contribution years", () => {
+    const s = signalsFromPayload(payload({ repos: [repo()], activeYears: 0 }), NOW);
+
+    expect(s.active_years).toBe(0);
+  });
+
+  it("uses contribution years at the recent-spike decision boundary", () => {
+    const contributionYears = yearsFrom(2021, 2026);
+    const ownedRepoYears = new Set([contributionYears[0], ...contributionYears.slice(-3)]);
+    const lifetimeContributions = 3_600;
+    const recentContributions = 1_600;
+    const correctedThreshold = 2 * (lifetimeContributions / contributionYears.length);
+    const repositoryThreshold = 2 * (lifetimeContributions / ownedRepoYears.size);
+
+    expect(recentContributions).toBeGreaterThan(correctedThreshold);
+    expect(recentContributions).toBeLessThanOrEqual(repositoryThreshold);
+
+    const s = signalsFromPayload(
+      payload({
+        createdAt: "2021-01-01T00:00:00Z",
+        activeYears: contributionYears.length,
+        lifetimeContributions,
+        recentCommits: recentContributions,
+      }),
+      NOW,
+    );
+
+    expect(s.active_years).toBe(contributionYears.length);
+    expect(s.recent_spike).toBe(true);
   });
 });

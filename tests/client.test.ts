@@ -21,6 +21,17 @@ import { hashLogin } from "@/lib/github/tokens";
 const POOL = ["tokA", "tokB", "tokC", "tokD"];
 const NOW = new Date("2026-07-03T12:00:00Z");
 const LOGIN = "someuser";
+const yearsFrom = (start: number, end: number) =>
+  Array.from({ length: end - start + 1 }, (_, index) => start + index);
+const queryYears = (body: string) => [...body.matchAll(/y(\d{4}):/g)].map((match) => Number(match[1]));
+const yearCollection = (contributions: number, active: boolean) => ({
+  totalCommitContributions: contributions,
+  totalIssueContributions: 0,
+  totalPullRequestContributions: 0,
+  totalPullRequestReviewContributions: 0,
+  restrictedContributionsCount: 0,
+  hasAnyContributions: active,
+});
 const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 const healthKey = (idx: number) => `gitfut:ghtoken:v1:${idx}`;
 const nowSec = () => Math.floor(Date.now() / 1000);
@@ -359,13 +370,19 @@ describe("fetchProfile GraphQL error triage + resource-limit fallback", () => {
   });
 
   it("retries a resource-limited lifetime batch year by year", async () => {
+    const requestedYears = yearsFrom(new Date(USER.createdAt).getUTCFullYear(), NOW.getUTCFullYear());
     const YEAR = {
       totalCommitContributions: 5,
       totalIssueContributions: 1,
       totalPullRequestContributions: 2,
       totalPullRequestReviewContributions: 1,
       restrictedContributionsCount: 1,
+      hasAnyContributions: true,
     };
+    const contributionsPerYear = Object.values(YEAR).reduce<number>(
+      (total, value) => total + (typeof value === "number" ? value : 0),
+      0,
+    );
     scriptFetch((_t, body) => {
       if (body.includes("query Profile(")) return ok({ data: { user: USER } });
       if (body.includes("query Lifetime(")) {
@@ -378,9 +395,139 @@ describe("fetchProfile GraphQL error triage + resource-limit fallback", () => {
     });
 
     const payload = await fetchProfile(LOGIN, NOW);
-    // createdAt 2023 -> years 2023..2026: 1 failed batch + 4 single-year retries.
-    expect(calls.filter((c) => c.body.includes("query Lifetime(")).length).toBe(5);
-    expect(payload.lifetimeContributions).toBe(10 * 4);
+    expect(calls.filter((c) => c.body.includes("query Lifetime(")).length).toBe(1 + requestedYears.length);
+    expect(payload.lifetimeContributions).toBe(contributionsPerYear * requestedYears.length);
+    expect(payload.activeYears).toBe(requestedYears.length);
+  });
+});
+
+describe("fetchProfile lifetime contribution years", () => {
+  const startYear = 2021;
+  const accountYears = yearsFrom(startYear, NOW.getUTCFullYear());
+  const contributionCount = (year: number) => year - startYear + 1;
+  const ownedNode = (year: number) => ({
+    nameWithOwner: `${LOGIN}/repo-${year}`,
+    stargazerCount: 0,
+    primaryLanguage: null,
+    createdAt: `${year}-01-01T00:00:00Z`,
+    pushedAt: `${year}-12-01T00:00:00Z`,
+  });
+  const userWithOwnedRepoYears = (ownedRepoYears: Set<number>) => ({
+    ...USER,
+    createdAt: `${startYear}-01-01T00:00:00Z`,
+    repositories: {
+      totalCount: ownedRepoYears.size,
+      nodes: [...ownedRepoYears].map(ownedNode),
+    },
+  });
+  const collectionsFor = (
+    body: string,
+    contributionYears: Set<number>,
+    missingYears = new Set<number>(),
+  ) =>
+    Object.fromEntries(
+      queryYears(body)
+        .filter((year) => !missingYears.has(year))
+        .map((year) => [
+          `y${year}`,
+          yearCollection(contributionYears.has(year) ? contributionCount(year) : 0, contributionYears.has(year)),
+        ]),
+    );
+  const lifetimeResourceError = () =>
+    ok({
+      data: { user: null },
+      errors: [{ type: "RESOURCE_LIMITS_EXCEEDED", message: "Resource limits for this query exceeded." }],
+    });
+
+  it("derives active years from annual activity rather than owned-repository dates", async () => {
+    const contributionYears = new Set(accountYears);
+    const ownedRepoYears = new Set([accountYears[0], ...accountYears.slice(-3)]);
+    const user = userWithOwnedRepoYears(ownedRepoYears);
+
+    scriptFetch((_token, body) => {
+      if (body.includes("query Profile(")) return ok({ data: { user } });
+      return ok({ data: { user: collectionsFor(body, contributionYears) } });
+    });
+
+    const result = await fetchProfile(LOGIN, NOW);
+    const lifetimeCalls = calls.filter((call) => call.body.includes("query Lifetime("));
+
+    expect(lifetimeCalls.every((call) => call.body.includes("hasAnyContributions"))).toBe(true);
+    expect(result.activeYears).toBe(contributionYears.size);
+    expect(result.activeYears).not.toBe(ownedRepoYears.size);
+  });
+
+  it("counts only non-contiguous years where GitHub reports activity", async () => {
+    const contributionYears = new Set(accountYears.filter((_year, index) => index % 2 === 0));
+    const user = userWithOwnedRepoYears(new Set(accountYears));
+
+    scriptFetch((_token, body) =>
+      body.includes("query Profile(")
+        ? ok({ data: { user } })
+        : ok({ data: { user: collectionsFor(body, contributionYears) } }),
+    );
+
+    const result = await fetchProfile(LOGIN, NOW);
+    const expectedLifetime = [...contributionYears].reduce((total, year) => total + contributionCount(year), 0);
+
+    expect(result.activeYears).toBe(contributionYears.size);
+    expect(result.lifetimeContributions).toBe(expectedLifetime);
+  });
+
+  it("retains recovered years when a batch falls back to individual requests", async () => {
+    const contributionYears = new Set(accountYears);
+    const user = userWithOwnedRepoYears(new Set());
+
+    scriptFetch((_token, body) => {
+      if (body.includes("query Profile(")) return ok({ data: { user } });
+      if (queryYears(body).length > 1) return lifetimeResourceError();
+      return ok({ data: { user: collectionsFor(body, contributionYears) } });
+    });
+
+    const result = await fetchProfile(LOGIN, NOW);
+    const expectedLifetime = [...contributionYears].reduce((total, year) => total + contributionCount(year), 0);
+
+    expect(result.activeYears).toBe(contributionYears.size);
+    expect(result.lifetimeContributions).toBe(expectedLifetime);
+  });
+
+  it("treats an individually unavailable year as zero and inactive", async () => {
+    const contributionYears = new Set(accountYears);
+    const unavailableYears = new Set([accountYears[Math.floor(accountYears.length / 2)]]);
+    const user = userWithOwnedRepoYears(new Set());
+
+    scriptFetch((_token, body) => {
+      if (body.includes("query Profile(")) return ok({ data: { user } });
+      const requestedYears = queryYears(body);
+      if (requestedYears.length > 1 || unavailableYears.has(requestedYears[0])) return lifetimeResourceError();
+      return ok({ data: { user: collectionsFor(body, contributionYears) } });
+    });
+
+    const result = await fetchProfile(LOGIN, NOW);
+    const recoveredYears = accountYears.filter((year) => !unavailableYears.has(year));
+    const expectedLifetime = recoveredYears.reduce((total, year) => total + contributionCount(year), 0);
+
+    expect(result.activeYears).toBe(recoveredYears.length);
+    expect(result.lifetimeContributions).toBe(expectedLifetime);
+  });
+
+  it("treats an omitted annual collection as zero and inactive", async () => {
+    const contributionYears = new Set(accountYears);
+    const missingYears = new Set([accountYears[Math.floor(accountYears.length / 2)]]);
+    const user = userWithOwnedRepoYears(new Set());
+
+    scriptFetch((_token, body) =>
+      body.includes("query Profile(")
+        ? ok({ data: { user } })
+        : ok({ data: { user: collectionsFor(body, contributionYears, missingYears) } }),
+    );
+
+    const result = await fetchProfile(LOGIN, NOW);
+    const returnedYears = accountYears.filter((year) => !missingYears.has(year));
+    const expectedLifetime = returnedYears.reduce((total, year) => total + contributionCount(year), 0);
+
+    expect(result.activeYears).toBe(returnedYears.length);
+    expect(result.lifetimeContributions).toBe(expectedLifetime);
   });
 });
 

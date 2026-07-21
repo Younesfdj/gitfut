@@ -69,3 +69,14 @@ describe("buildCard — founder overrides", () => {
     expect(card.founder).toBeUndefined();
   });
 });
+
+describe("buildCard — recent contribution spike", () => {
+  it("promotes an otherwise identical gold card to in-form", () => {
+    const steady = buildCard({ ...base, recent_spike: false });
+    const spiking = buildCard({ ...base, recent_spike: true });
+
+    expect(spiking.overall).toBe(steady.overall);
+    expect(steady.finish).toBe("gold");
+    expect(spiking.finish).toBe("totw");
+  });
+});

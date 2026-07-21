@@ -72,6 +72,7 @@ export interface RawPayload {
   recentRestricted: number; // last-year private contributions (count only)
   recentActiveDays: number;
   lifetimeContributions: number; // all years, all types, incl. private
+  activeYears: number; // calendar years where GitHub reports any contribution activity
 }
 
 const ENDPOINT = "https://api.github.com/graphql";
@@ -146,6 +147,17 @@ interface YearContrib {
   totalPullRequestContributions: number;
   totalPullRequestReviewContributions: number;
   restrictedContributionsCount: number;
+  hasAnyContributions: boolean;
+}
+
+interface LifetimeSummary {
+  totalContributions: number;
+  activeYears: number;
+}
+
+interface YearResult {
+  contributions: number;
+  active: boolean;
 }
 
 // POSTs a query, retrying transient failures. Terminal failures (bad token,
@@ -437,7 +449,7 @@ function lifetimeQuery(
   const aliases = years
     .map((y) => {
       const to = y === currentYear ? nowIso : `${y}-12-31T23:59:59Z`;
-      return `        y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${to}") { totalCommitContributions totalIssueContributions totalPullRequestContributions totalPullRequestReviewContributions restrictedContributionsCount }`;
+      return `        y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${to}") { totalCommitContributions totalIssueContributions totalPullRequestContributions totalPullRequestReviewContributions restrictedContributionsCount hasAnyContributions }`;
     })
     .join("\n");
   return `
@@ -461,8 +473,9 @@ const sumContrib = (c: YearContrib) =>
   c.totalPullRequestReviewContributions +
   c.restrictedContributionsCount;
 
-// Sum of every year's contributions (commits + issues + PRs + reviews + private).
-// Each batch is best-effort: a batch that fails after its retry contributes 0
+// Summarize every year's contributions (commits + issues + PRs + reviews +
+// private) while the annual boundaries still exist. Each batch is best-effort:
+// a year that remains unavailable after its retry contributes 0 and is inactive
 // rather than failing the scout.
 async function fetchLifetime(
   login: string,
@@ -470,39 +483,52 @@ async function fetchLifetime(
   createdYear: number,
   currentYear: number,
   nowIso: string,
-): Promise<number> {
+): Promise<LifetimeSummary> {
   const years: number[] = [];
   for (let y = Math.max(createdYear, GITHUB_EPOCH_YEAR); y <= currentYear; y++) years.push(y);
 
-  const yearsTotal = async (batch: number[]): Promise<number> => {
+  const fetchYears = async (batch: number[]): Promise<YearResult[]> => {
     const { user } = await gql<Record<string, YearContrib | null>>(
       lifetimeQuery(batch, currentYear, nowIso),
       login,
       tok,
     );
-    if (!user) return 0;
-    return batch.reduce((s, y) => {
-      const c = user[`y${y}`];
-      return c ? s + sumContrib(c) : s;
-    }, 0);
+    return batch.map((year) => {
+      const collection = user?.[`y${year}`];
+      return collection
+        ? {
+            contributions: sumContrib(collection),
+            active: collection.hasAnyContributions,
+          }
+        : { contributions: 0, active: false };
+    });
   };
 
-  const sums = await Promise.all(
+  const batches = await Promise.all(
     chunk(years, LIFETIME_BATCH).map(async (batch) => {
       try {
-        return await yearsTotal(batch);
+        return await fetchYears(batch);
       } catch {
         // Aliased years pool their resource cost, so one hyperactive year sinks
         // its whole batch — retry each year alone (own request, own budget) and
         // let only the truly over-budget years degrade to 0.
-        const singles = await Promise.all(
-          batch.map((y) => yearsTotal([y]).catch(() => 0)),
+        return Promise.all(
+          batch.map(async (year) => {
+            try {
+              return (await fetchYears([year]))[0];
+            } catch {
+              return { contributions: 0, active: false };
+            }
+          }),
         );
-        return singles.reduce((a, b) => a + b, 0);
       }
     }),
   );
-  return sums.reduce((a, b) => a + b, 0);
+  const results = batches.flat();
+  return {
+    totalContributions: results.reduce((total, year) => total + year.contributions, 0),
+    activeYears: results.filter((year) => year.active).length,
+  };
 }
 
 export async function fetchProfile(
@@ -547,7 +573,7 @@ export async function fetchProfile(
   if (!user) return fail("notfound", "No GitHub user by that name.");
 
   const createdYear = new Date(user.createdAt).getUTCFullYear();
-  const lifetimeContributions = await fetchLifetime(
+  const lifetime = await fetchLifetime(
     login,
     tok,
     createdYear,
@@ -555,10 +581,10 @@ export async function fetchProfile(
     now.toISOString(),
   );
 
-  return normalize(user, lifetimeContributions);
+  return normalize(user, lifetime);
 }
 
-function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
+function normalize(user: UserNode, lifetime: LifetimeSummary): RawPayload {
   const repos: RawRepo[] = user.repositories.nodes.map((n) => ({
     stars: n.stargazerCount ?? 0,
     language: n.primaryLanguage?.name ?? null,
@@ -608,6 +634,7 @@ function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
     recentIssues: user.recent.totalIssueContributions,
     recentRestricted: user.recent.restrictedContributionsCount,
     recentActiveDays,
-    lifetimeContributions,
+    lifetimeContributions: lifetime.totalContributions,
+    activeYears: lifetime.activeYears,
   };
 }
