@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import ScoutForm from "@/components/ScoutForm";
 import CardFan from "@/components/CardFan";
 import LoadingScreen from "@/components/LoadingScreen";
@@ -57,7 +58,13 @@ export default function AppShell({
       <main className="relative z-[2] flex min-h-screen flex-col">
         {/* Overlaid in the corner (not a flow header) so it never pushes the
             vertically-centered hero down. */}
-        <div className="absolute right-[clamp(20px,5vw,52px)] top-[clamp(16px,3vh,26px)] z-[3]">
+        <div className="absolute right-[clamp(20px,5vw,52px)] top-[clamp(16px,3vh,26px)] z-[3] flex items-center gap-4">
+          <Link
+            href="/leaderboard"
+            className="font-display text-[13px] tracking-[.1em] text-ink-soft transition hover:text-ink"
+          >
+            LEADERBOARD
+          </Link>
           <GithubStar stars={stars} />
         </div>
         <div className="mx-auto flex w-full max-w-[1180px] flex-1 items-center gap-[clamp(24px,5vw,72px)] px-[clamp(22px,5vw,56px)] max-[860px]:flex-col max-[860px]:gap-[34px] max-[860px]:pb-6 max-[860px]:pt-[clamp(40px,6vh,56px)] max-[860px]:text-center">
