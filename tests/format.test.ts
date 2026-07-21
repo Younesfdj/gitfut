@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCount, round1, round2 } from "@/lib/format";
+import { formatCount, formatThousands, round1, round2 } from "@/lib/format";
 
 // formatCount feeds the card, the scout report and the duel bars, so the exact
 // strings matter: they have to stay short enough for the fixed-width slots and
@@ -33,6 +33,36 @@ describe("formatCount", () => {
 
   it("rolls over rather than rounding up to 1000k", () => {
     expect(formatCount(999_999)).toBe("1M");
+  });
+});
+
+// These strings get serialized into a hidden <Tip> text node on the scout
+// report. SSR (Node) and CSR (browser) have to agree byte-for-byte on the very
+// first paint, so we lock the locale — without "en-US", a Spanish-locale
+// browser hydrates "5.000" against server-side "5,000" and React throws a
+// hydration mismatch. formatCount was already locale-independent (toFixed +
+// "k"); formatThousands carries the same guarantee, just for the
+// un-abbreviated thousands-grouping copy we use in tooltips.
+describe("formatThousands", () => {
+  it("renders single-digit numbers verbatim", () => {
+    expect(formatThousands(0)).toBe("0");
+    expect(formatThousands(7)).toBe("7");
+  });
+
+  it("renders three-digit numbers without grouping", () => {
+    expect(formatThousands(500)).toBe("500");
+    expect(formatThousands(999)).toBe("999");
+  });
+
+  it("groups thousands with en-US commas (locked locale)", () => {
+    expect(formatThousands(1000)).toBe("1,000");
+    expect(formatThousands(1234)).toBe("1,234");
+    expect(formatThousands(12345)).toBe("12,345");
+    expect(formatThousands(1234567)).toBe("1,234,567");
+  });
+
+  it("handles negative numbers consistently", () => {
+    expect(formatThousands(-1234)).toBe("-1,234");
   });
 });
 
