@@ -14,8 +14,8 @@ import { tokenPool, pickToken, pickFailover, recordTokenHealth, benchToken, type
 // Lifetime contributions need one contributionsCollection window per calendar
 // year (each window must span ≤1yr). GitHub's resolver times out (~10s) if too
 // many windows share a request, so we fetch the profile in one fast query, then
-// the years in small parallel batches with a retry — and tolerate a dropped
-// batch (the figure is only used log-scaled, so a missing year barely moves it).
+// the years in small parallel batches. Failed batches retry year by year; an
+// individually unavailable year becomes zero/inactive so the scout stays usable.
 //
 // GitHub also rejects contributionsCollection outright (RESOURCE_LIMITS_EXCEEDED)
 // when the window holds too many contribution events — measured mid-2026 at
@@ -509,9 +509,9 @@ async function fetchLifetime(
       try {
         return await fetchYears(batch);
       } catch {
-        // Aliased years pool their resource cost, so one hyperactive year sinks
-        // its whole batch — retry each year alone (own request, own budget) and
-        // let only the truly over-budget years degrade to 0.
+        // Aliased years pool their resource cost, so one unavailable year can
+        // sink its whole batch. Retry each year with its own request and budget,
+        // then degrade only individually unavailable years to zero/inactive.
         return Promise.all(
           batch.map(async (year) => {
             try {
