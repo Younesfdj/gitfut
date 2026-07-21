@@ -18,11 +18,13 @@ export interface Standing {
 }
 
 // Percent → display string: whole numbers from 10 up, one decimal from 1, two
-// below that.
+// below that. Never renders "0.00": two-decimal rounding flattens anything under
+// 0.005, and "Top < 0.00%" is a claim about nobody. A floor of 0.01 keeps the
+// smallest claim meaningful and still true (it's already an upper bound).
 export function formatPct(p: number): string {
   if (p >= 10) return String(Math.round(p));
   if (p >= 1) return p.toFixed(1);
-  return p.toFixed(2);
+  return Math.max(p, 0.01).toFixed(2);
 }
 
 /**

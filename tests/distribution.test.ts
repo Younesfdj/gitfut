@@ -28,6 +28,14 @@ describe("formatPct", () => {
     expect(formatPct(0.99)).toBe("0.99");
     expect(formatPct(0.016)).toBe("0.02");
   });
+
+  // Two-decimal rounding flattens anything under 0.005 to "0.00", and a label
+  // reading "Top < 0.00%" is a claim about nobody.
+  it("floors the display at 0.01 instead of rendering 0.00", () => {
+    expect(formatPct(0.004)).toBe("0.01");
+    expect(formatPct(0.0000001)).toBe("0.01");
+    expect(formatPct(0)).toBe("0.01");
+  });
 });
 
 describe("standing", () => {
@@ -59,6 +67,13 @@ describe("standing", () => {
 
     it("shows the bound with a '<' so it doesn't read as measured", () => {
       expect(standing(COUNTS, N, 54, 50).label).toBe("Top < 15%");
+    });
+
+    // The shipped sample is n = 18_107, so the bound is 0.02% today. Regenerate
+    // it past ~60k accounts and the bound slips under 0.005 — where two-decimal
+    // rounding used to print the meaningless "Top < 0.00%".
+    it("never prints '< 0.00%', however large the sample gets", () => {
+      expect(standing([1], 100_000, 99, 50).label).toBe("Top < 0.01%");
     });
   });
 
