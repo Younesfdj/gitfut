@@ -23,7 +23,10 @@ export function signalsFromPayload(p: RawPayload, now = Date.now()): Signals {
   // GitHub reports this over the same annual contribution collections used for
   // the lifetime total, so organization and private activity count even when no
   // personally-owned repository changed that year.
-  const active_years = Math.min(Math.max(p.activeYears, 0), Math.ceil(account_age_years));
+  const createdYear = new Date(p.createdAt).getUTCFullYear();
+  const currentYear = new Date(now).getUTCFullYear();
+  const accountCalendarYears = Math.max(0, currentYear - createdYear + 1);
+  const active_years = Math.min(Math.max(p.activeYears, 0), accountCalendarYears);
 
   // Recent activity over the last year: every contribution type GitHub exposes,
   // including the private (restricted) count, so it matches the profile graph.

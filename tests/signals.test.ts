@@ -114,6 +114,20 @@ describe("signalsFromPayload — active contribution years", () => {
     expect(s.active_years).toBe(0);
   });
 
+  it("allows activity in every inclusive calendar year for late-year accounts", () => {
+    const contributionYears = yearsFrom(2021, 2026);
+    const s = signalsFromPayload(
+      payload({
+        createdAt: "2021-12-31T23:59:59Z",
+        activeYears: contributionYears.length,
+      }),
+      NOW,
+    );
+
+    expect(s.account_age_years).toBeLessThan(contributionYears.length - 1);
+    expect(s.active_years).toBe(contributionYears.length);
+  });
+
   it("uses contribution years at the recent-spike decision boundary", () => {
     const contributionYears = yearsFrom(2021, 2026);
     const ownedRepoYears = new Set([contributionYears[0], ...contributionYears.slice(-3)]);
