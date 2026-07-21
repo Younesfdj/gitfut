@@ -46,6 +46,7 @@ const TOKEN = process.env.GH_TOKEN!;
 const MAX_ID = 300_000_000;
 const ENDPOINT = "https://api.github.com/graphql";
 const CONCURRENCY = 8;
+const LIFETIME_BATCH = 4;
 const DIST_MIN = 50;
 const FLUSH_EVERY = 100;
 
@@ -156,50 +157,82 @@ type YearContrib = {
   totalPullRequestContributions: number;
   totalPullRequestReviewContributions: number;
   restrictedContributionsCount: number;
+  hasAnyContributions: boolean;
+};
+
+type YearResult = {
+  contributions: number;
+  active: boolean;
+};
+
+type LifetimeSummary = {
+  totalContributions: number;
+  activeYears: number;
 };
 
 function lifetimeQuery(years: number[], currentYear: number, nowIso: string): string {
   const aliases = years
     .map((y) => {
       const to = y === currentYear ? nowIso : `${y}-12-31T23:59:59Z`;
-      return `y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${to}") { totalCommitContributions totalIssueContributions totalPullRequestContributions totalPullRequestReviewContributions restrictedContributionsCount }`;
+      return `y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${to}") { totalCommitContributions totalIssueContributions totalPullRequestContributions totalPullRequestReviewContributions restrictedContributionsCount hasAnyContributions }`;
     })
     .join("\n");
   return `query Lifetime($login: String!) { user(login: $login) { ${aliases} } }`;
 }
 
-async function fetchLifetime(login: string, createdYear: number): Promise<number> {
+async function fetchLifetime(login: string, createdYear: number): Promise<LifetimeSummary> {
   const now = new Date();
   const currentYear = now.getUTCFullYear();
   const years: number[] = [];
   for (let y = Math.max(createdYear, 2008); y <= currentYear; y++) years.push(y);
   const batches: number[][] = [];
-  for (let i = 0; i < years.length; i += 5) batches.push(years.slice(i, i + 5));
-  const sums = await Promise.all(
-    batches.map(async (batch) => {
-      const u = await gql<Record<string, YearContrib | null>>(lifetimeQuery(batch, currentYear, now.toISOString()), login);
-      if (!u) return 0;
-      return batch.reduce((s, y) => {
-        const c = u[`y${y}`];
-        return c
-          ? s +
-              c.totalCommitContributions +
-              c.totalIssueContributions +
-              c.totalPullRequestContributions +
-              c.totalPullRequestReviewContributions +
-              c.restrictedContributionsCount
-          : s;
-      }, 0);
-    }),
-  );
-  return sums.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < years.length; i += LIFETIME_BATCH) batches.push(years.slice(i, i + LIFETIME_BATCH));
+
+  const fetchYears = async (batch: number[]): Promise<YearResult[] | null> => {
+    const user = await gql<Record<string, YearContrib | null>>(
+      lifetimeQuery(batch, currentYear, now.toISOString()),
+      login,
+    );
+    if (!user) return null;
+    return batch.map((year) => {
+      const collection = user[`y${year}`];
+      return collection
+        ? {
+            contributions:
+              collection.totalCommitContributions +
+              collection.totalIssueContributions +
+              collection.totalPullRequestContributions +
+              collection.totalPullRequestReviewContributions +
+              collection.restrictedContributionsCount,
+            active: collection.hasAnyContributions,
+          }
+        : { contributions: 0, active: false };
+    });
+  };
+
+  const results = (
+    await Promise.all(
+      batches.map(async (batch) => {
+        const grouped = await fetchYears(batch);
+        if (grouped) return grouped;
+        return Promise.all(
+          batch.map(async (year) => (await fetchYears([year]))?.[0] ?? { contributions: 0, active: false }),
+        );
+      }),
+    )
+  ).flat();
+
+  return {
+    totalContributions: results.reduce((total, year) => total + year.contributions, 0),
+    activeYears: results.filter((year) => year.active).length,
+  };
 }
 
 async function fetchPayload(login: string): Promise<RawPayload | null> {
   const user = await gql<UserNode>(PROFILE_QUERY, login);
   if (!user) return null;
   const createdYear = new Date(user.createdAt).getUTCFullYear();
-  const lifetimeContributions = await fetchLifetime(login, createdYear);
+  const lifetime = await fetchLifetime(login, createdYear);
   const repos: RawRepo[] = user.repositories.nodes.map((n) => ({
     stars: n.stargazerCount ?? 0,
     language: n.primaryLanguage?.name ?? null,
@@ -241,7 +274,8 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
     recentIssues: user.recent.totalIssueContributions,
     recentRestricted: user.recent.restrictedContributionsCount,
     recentActiveDays,
-    lifetimeContributions,
+    lifetimeContributions: lifetime.totalContributions,
+    activeYears: lifetime.activeYears,
   };
 }
 
