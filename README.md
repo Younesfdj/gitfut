@@ -28,9 +28,15 @@ Your card lives at a URL. Drop it in your profile README, your portfolio, anywhe
 [![My GitFut card](https://gitfut.com/YOUR_USERNAME.png)](https://gitfut.com/YOUR_USERNAME)
 ```
 
+> **Tip:** some platforms (like GitHub profile READMEs) render SVG more reliably than PNG from external sources. Use `.svg` instead:
+> ```md
+> [![My GitFut card](https://gitfut.com/YOUR_USERNAME.svg)](https://gitfut.com/YOUR_USERNAME)
+> ```
+
 | | |
 |---|---|
 | **`gitfut.com/<username>.png`** | your card, as a live image |
+| **`gitfut.com/<username>.svg`** | same card, SVG format (better for GitHub READMEs) |
 | **`gitfut.com/<username>`** | the full scout report |
 | **`?country=XX`** | override the flag (e.g. `?country=DZ`) |
 
