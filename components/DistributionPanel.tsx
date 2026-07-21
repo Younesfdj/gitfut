@@ -1,6 +1,7 @@
 "use client";
 
 import { DIST_ACTIVE_COUNTS, DIST_ACTIVE_N, DIST_COUNTS, DIST_MIN, DIST_N } from "@/lib/distribution-data";
+import { standing } from "@/lib/distribution";
 import { resolveResultTheme } from "./finishTheme";
 import { Tip } from "./ScoutReport";
 import type { Card } from "@/lib/scoring/types";
@@ -24,17 +25,10 @@ export default function DistributionPanel({ card }: { card: Card }) {
 
   const meX = xFor(card.overall + 0.5);
 
-  // "Top X%" = share of the population rated at least this card's overall. When
-  // nothing in the sample reaches it, the honest claim is the rule-of-three
-  // bound: at 95% confidence the true share is below 3/n.
-  const fmtPct = (p: number) => (p >= 10 ? `${Math.round(p)}` : p >= 1 ? p.toFixed(1) : p.toFixed(2));
-  const top = (counts: number[], n: number) => {
-    const atOrAbove = counts.reduce((s, c, i) => s + (DIST_MIN + i >= card.overall ? c : 0), 0);
-    const pct = atOrAbove > 0 ? (100 * atOrAbove) / n : (100 * 3) / n;
-    return { atOrAbove, label: `Top ${atOrAbove > 0 ? "" : "< "}${fmtPct(pct)}%` };
-  };
-  const all = top(DIST_COUNTS, DIST_N);
-  const act = top(DIST_ACTIVE_COUNTS, DIST_ACTIVE_N);
+  // "Top X%" = share of the population rated at least this card's overall (see
+  // lib/distribution for the rule-of-three bound when nothing reaches it).
+  const all = standing(DIST_COUNTS, DIST_N, card.overall);
+  const act = standing(DIST_ACTIVE_COUNTS, DIST_ACTIVE_N, card.overall);
   const tipText =
     `Higher than ${(DIST_N - all.atOrAbove).toLocaleString()} of ${DIST_N.toLocaleString()} randomly sampled GitHub users, ` +
     `and ${(DIST_ACTIVE_N - act.atOrAbove).toLocaleString()} of the ${DIST_ACTIVE_N.toLocaleString()} who were active in the past year.`;
