@@ -11,6 +11,7 @@ import VsBurst from "./VsBurst";
 import Mascot from "./Mascot";
 import FooterCredit from "./FooterCredit";
 import GithubStar from "./GithubStar";
+import ActivityPrivacyNotice from "./ActivityPrivacyNotice";
 import BuyMeACoffee from "./BuyMeACoffee";
 import SupportProductHunt from "./SupportProductHunt";
 import { XLogo } from "./BrandIcons";
@@ -270,6 +271,9 @@ export default function DuelView({
               {card.archetype}
             </span> · {card.report.style}
           </div>
+          {card.hiddenActivity && (
+            <ActivityPrivacyNotice login={card.login} compact />
+          )}
           {card.report.playstyles.length > 0 && (
             <div className="flex flex-wrap items-center justify-center gap-[5px]">
               {card.report.playstyles.map((p) => {

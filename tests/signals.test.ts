@@ -32,6 +32,7 @@ const payload = (over: Partial<RawPayload> = {}): RawPayload => ({
   recentRestricted: 0,
   recentActiveDays: 0,
   lifetimeContributions: 0,
+  hiddenActivity: false,
   ...over,
 });
 

@@ -28,6 +28,7 @@ const quiet: Signals = {
   issues_closed: 0,
   recent_commits: 18,
   recent_spike: false,
+  hidden_activity: false,
 };
 
 const signals = (over: Partial<Signals> = {}): Signals => ({ ...quiet, ...over });

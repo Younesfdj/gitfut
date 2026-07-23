@@ -14,6 +14,7 @@ import FooterCredit from "./FooterCredit";
 import BuyMeACoffee from "./BuyMeACoffee";
 import SupportProductHunt from "./SupportProductHunt";
 import GithubStar from "./GithubStar";
+import ActivityPrivacyNotice from "./ActivityPrivacyNotice";
 import dynamic from "next/dynamic";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
 import DistributionPanel from "./DistributionPanel";
@@ -133,6 +134,12 @@ export default function ResultView({
       <div className="shrink-0">
         <ReportHeader card={card} />
       </div>
+
+      {card.hiddenActivity && (
+        <div className="mt-[clamp(10px,1.6vh,16px)] shrink-0 px-[8px]">
+          <ActivityPrivacyNotice login={card.login} />
+        </div>
+      )}
 
       <div className="mt-[clamp(14px,2.4vh,26px)] grid grid-cols-[1fr_auto_1fr] items-start gap-[clamp(16px,2.4vw,40px)] max-[980px]:mt-6 max-[980px]:flex max-[980px]:flex-col max-[980px]:items-center">
         {/* left — attributes + playstyles */}

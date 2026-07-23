@@ -211,6 +211,7 @@ export function buildCard(s: Signals): Card {
     topLanguage: s.topLanguage ?? null,
     languageLogo,
     ...(founder ? { founder } : null),
+    hiddenActivity: s.hidden_activity,
     legacy: { L },
     report: {
       skillMoves: skill.value,
