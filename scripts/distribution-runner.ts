@@ -225,6 +225,13 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
     (days, w) => days + w.contributionDays.filter((d) => d.contributionCount > 0).length,
     0,
   );
+  // Mirrors normalize() in lib/github/client.ts: contributionsCollection is
+  // what the privacy setting zeroes, not repo pushedAt, so a recently pushed
+  // owned repo is the evidence that tells "hidden" apart from "really inactive".
+  const RECENT_YEAR_MS = 365 * 86_400_000;
+  const hasRecentRepoActivity = repos.some(
+    (r) => Date.now() - Date.parse(r.pushedAt) <= RECENT_YEAR_MS,
+  );
   return {
     login: user.login,
     name: user.name,
@@ -242,6 +249,15 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
     recentRestricted: user.recent.restrictedContributionsCount,
     recentActiveDays,
     lifetimeContributions,
+    hiddenActivity:
+      user.recent.totalCommitContributions === 0 &&
+      user.recent.totalPullRequestContributions === 0 &&
+      user.recent.totalPullRequestReviewContributions === 0 &&
+      user.recent.totalIssueContributions === 0 &&
+      user.recent.restrictedContributionsCount === 0 &&
+      recentActiveDays === 0 &&
+      lifetimeContributions === 0 &&
+      hasRecentRepoActivity,
   };
 }
 

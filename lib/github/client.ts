@@ -72,6 +72,15 @@ export interface RawPayload {
   recentRestricted: number; // last-year private contributions (count only)
   recentActiveDays: number;
   lifetimeContributions: number; // all years, all types, incl. private
+  // GitHub's "private contributions" account setting zeroes out
+  // contributionsCollection entirely for every viewer but the owner — recent AND
+  // every lifetime year — even when the account has real, public, recent commits.
+  // No API field says so directly, and the all-zero signature alone is
+  // ambiguous: a genuinely new/inactive account produces identical zeros. What
+  // tells them apart is repos: contributionsCollection is the only thing the
+  // privacy setting touches, so an owned public repo pushed within the last
+  // year is real activity that survives it — see hasRecentRepoActivity below.
+  hiddenActivity: boolean;
 }
 
 const ENDPOINT = "https://api.github.com/graphql";
@@ -555,10 +564,10 @@ export async function fetchProfile(
     now.toISOString(),
   );
 
-  return normalize(user, lifetimeContributions);
+  return normalize(user, lifetimeContributions, now);
 }
 
-function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
+function normalize(user: UserNode, lifetimeContributions: number, now: Date): RawPayload {
   const repos: RawRepo[] = user.repositories.nodes.map((n) => ({
     stars: n.stargazerCount ?? 0,
     language: n.primaryLanguage?.name ?? null,
@@ -592,6 +601,29 @@ function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
     0,
   );
 
+  // A repo push isn't part of contributionsCollection, so the privacy setting
+  // can't touch it — an owned public repo pushed in the last year is real,
+  // dated evidence of work that the all-zero contribution figures contradict.
+  // A genuinely new/inactive account has no such repo to point to.
+  const hasRecentRepoActivity = repos.some(
+    (r) => now.getTime() - Date.parse(r.pushedAt) <= RECENT_YEAR_MS,
+  );
+
+  // Every contribution figure (recent AND lifetime) is zero — the signature a
+  // "private activity" account leaves across every window, GitHub's usual grid
+  // included — but only counts as *hidden* (vs. a real zero-contribution
+  // account, which produces identical zeros) when there's also a recently
+  // pushed public repo contradicting it.
+  const hiddenActivity =
+    user.recent.totalCommitContributions === 0 &&
+    user.recent.totalPullRequestContributions === 0 &&
+    user.recent.totalPullRequestReviewContributions === 0 &&
+    user.recent.totalIssueContributions === 0 &&
+    user.recent.restrictedContributionsCount === 0 &&
+    recentActiveDays === 0 &&
+    lifetimeContributions === 0 &&
+    hasRecentRepoActivity;
+
   return {
     login: user.login,
     name: user.name,
@@ -609,5 +641,6 @@ function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
     recentRestricted: user.recent.restrictedContributionsCount,
     recentActiveDays,
     lifetimeContributions,
+    hiddenActivity,
   };
 }

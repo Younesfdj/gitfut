@@ -30,6 +30,9 @@ export interface Signals {
   issues_closed: number;
   recent_commits: number;
   recent_spike: boolean;
+  // See RawPayload.hiddenActivity (lib/github/client.ts) — GitHub's all-zero
+  // signature for an account with contribution activity hidden from viewers.
+  hidden_activity: boolean;
 }
 
 export type WorkRateLevel = "High" | "Med" | "Low";
@@ -102,5 +105,9 @@ export interface Card {
   // Set only for gitfut founders — their bespoke card art/accent + hint metadata.
   // Optional so every other card (and previously serialized ones) stay valid.
   founder?: FounderMeta;
+  // Flags that GitHub's own numbers for this login look hidden (see
+  // Signals.hidden_activity) — optional so previously serialized cards
+  // (localStorage, Redis cache) without it still parse as valid.
+  hiddenActivity?: boolean;
   report: Report;
 }

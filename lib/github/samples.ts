@@ -31,6 +31,7 @@ const RAW: Signals[] = [
     issues_closed: 2,
     recent_commits: 3255,
     recent_spike: false,
+    hidden_activity: false,
   },
   {
     login: "ThePrimeagen",
@@ -55,6 +56,7 @@ const RAW: Signals[] = [
     issues_closed: 15,
     recent_commits: 2809,
     recent_spike: true,
+    hidden_activity: false,
   },
   {
     login: "pewdiepie-archdaemon",
@@ -79,6 +81,7 @@ const RAW: Signals[] = [
     issues_closed: 3,
     recent_commits: 566,
     recent_spike: false,
+    hidden_activity: false,
   },
   {
     login: "t3dotgg",
@@ -103,6 +106,7 @@ const RAW: Signals[] = [
     issues_closed: 4,
     recent_commits: 1488,
     recent_spike: false,
+    hidden_activity: false,
   },
 ];
 
