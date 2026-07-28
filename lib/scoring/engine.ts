@@ -179,9 +179,11 @@ export function buildCard(s: Signals): Card {
   // `finish` directly rather than via pickFinish: any overall >= 90 would
   // otherwise auto-promote to ICON (and flip club/archetype), hijacking the look.
   const founder = FOUNDERS[s.login.toLowerCase()];
-  const overall = founder
-    ? FOUNDER_OVERALL[s.login.toLowerCase()]
-    : clamp(baseOVR + Math.round(K.legacy.bonusMax * L), 1, 99);
+  const founderOverall = founder ? FOUNDER_OVERALL[s.login.toLowerCase()] : undefined;
+  const overall =
+    founderOverall !== undefined
+      ? clamp(founderOverall, 1, 99)
+      : clamp(baseOVR + Math.round(K.legacy.bonusMax * L), 1, 99);
   const finish: Finish = founder ? "founder" : pickFinish(overall, L, s.recent_spike, s.login);
   const archetype = founder
     ? { name: "Founder", blurb: "co-founder of GitFut — they built the very scout reading this card" }

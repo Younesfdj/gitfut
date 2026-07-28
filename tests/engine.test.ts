@@ -68,4 +68,18 @@ describe("buildCard — founder overrides", () => {
     expect(card.finish).not.toBe("founder");
     expect(card.founder).toBeUndefined();
   });
+
+  it("falls back to normal scoring when FOUNDER_OVERALL is missing for a founder login", () => {
+    const card = buildCard(withLogin("some-random-dev"));
+    expect(card.overall).toBeDefined();
+    expect(card.overall).toBeGreaterThanOrEqual(1);
+    expect(card.overall).toBeLessThanOrEqual(99);
+    expect(card.finish).not.toBe("founder");
+  });
+
+  it("clamps founder overall to the 1-99 range", () => {
+    const card = buildCard(withLogin("younesfdj"));
+    expect(card.overall).toBeGreaterThanOrEqual(1);
+    expect(card.overall).toBeLessThanOrEqual(99);
+  });
 });
