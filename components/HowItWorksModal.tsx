@@ -1,50 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale } from "@/lib/i18n/useLocale";
+import { useUIDict } from "@/lib/i18n/hooks";
+import { t } from "@/lib/i18n/t";
 
-// The six GitHub signals behind each stat — accurate to the engine (PACE is a
-// year of ALL contribution types, not just commits).
-const READS = [
-  { abbr: "PAC", gloss: "A year of commits, PRs, reviews & issues" },
-  { abbr: "SHO", gloss: "Stars earned, and your biggest single hit" },
-  { abbr: "PAS", gloss: "PRs into other people's repos, plus followers" },
-  { abbr: "DRI", gloss: "Your language range — broad helps, but the 10th counts for less" },
-  { abbr: "DEF", gloss: "Code reviews and issues closed" },
-  { abbr: "PHY", gloss: "A lifetime of contributions over your active years" },
-];
-
-// How the scout reads you — the three things that make a card a fingerprint
-// rather than a score. These are independent truths, not steps, so no 01/02/03.
-const LAWS = [
-  {
-    kicker: "MEASURED AGAINST YOU",
-    lead: "Your own curve, not the world's.",
-    body: "Each stat is weighed against the rest of your profile, so a high one marks where you stand out and a low one where you don't. That's why your weakest area can read lower than the raw number suggests — the card grades you on you.",
-  },
-  {
-    kicker: "EVERY CARD HAS A SHAPE",
-    lead: "Nobody's elite at everything.",
-    body: "Your strongest signals get pushed up and your weakest pulled down, so the card leans instead of sitting flat. That lean is what decides your position and archetype — read off your stats, never picked.",
-  },
-  {
-    kicker: "THE 90s ARE EARNED",
-    lead: "One big year won't crown you.",
-    body: "Stats top out at 88 on their own. The 90s take years on the clock and influence that lasts, so a legend rating is a track record, not a hot streak.",
-    gold: true,
-  },
-];
-
-// The finish ladder, low to legend — order carries meaning, hence the arrows.
-const LADDER = [
-  { label: "BRONZE", bg: "#2A1A0C", ink: "#F0CFA8" },
-  { label: "SILVER", bg: "#262B33", ink: "#D6DCE6" },
-  { label: "GOLD", bg: "#3A2806", ink: "#F3D679" },
-  { label: "IN-FORM", bg: "#4A0A14", ink: "#FFD3D9" },
-  { label: "TOTY", bg: "#10254F", ink: "#CADBFF" },
-  { label: "ICON", bg: "#2A1A45", ink: "#F3D688" },
-];
+const STAT_KEYS = ["pac", "sho", "pas", "dri", "def", "phy"] as const;
 
 export default function HowItWorksModal({ onClose }: { onClose: () => void }) {
+  const locale = useLocale();
+  const ui = useUIDict();
+  const hiw = ui.howItWorks;
+  const closeAria = hiw.close;
+
   const panelRef = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
 
@@ -56,10 +24,10 @@ export default function HowItWorksModal({ onClose }: { onClose: () => void }) {
     };
     document.addEventListener("keydown", onKey);
     panelRef.current?.focus();
-    const t = setTimeout(() => setShown(true), 10);
+    const tm = setTimeout(() => setShown(true), 10);
     return () => {
       document.removeEventListener("keydown", onKey);
-      clearTimeout(t);
+      clearTimeout(tm);
     };
   }, [onClose]);
 
@@ -92,7 +60,7 @@ export default function HowItWorksModal({ onClose }: { onClose: () => void }) {
 
         <button
           onClick={onClose}
-          aria-label="Close"
+          aria-label={closeAria}
           className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-[15px] text-ink-faint transition hover:bg-white/10 hover:text-ink"
         >
           ✕
@@ -100,24 +68,24 @@ export default function HowItWorksModal({ onClose }: { onClose: () => void }) {
 
         {/* hero — the thesis: we read you, we don't rate you */}
         <div className="font-mono mb-[14px] text-[11px] font-semibold tracking-[.32em] text-brand">
-          THE SCOUT&apos;S EYE
+          {hiw.kicker}
         </div>
         <h3
           id="hiw-title"
           className="font-display m-0 text-[clamp(30px,5.4vw,44px)] font-black leading-[.95] tracking-[-.01em]"
         >
-          We don&apos;t rate you.
+          {hiw.headlineTop}
           <br />
-          We read you<span className="text-brand">.</span>
+          {hiw.headlineMid}
+          <span className="text-brand">.</span>
         </h3>
         <p className="m-0 mt-[15px] max-w-[47ch] text-[14.5px] leading-[1.55] text-ink-dim">
-          Six signals off your live GitHub, weighed against each other to find your shape. That shape is your card — so
-          two devs with the same numbers still walk out different. Here&apos;s how to read yours.
+          {hiw.intro}
         </p>
 
         {/* the three laws — hairline-separated, scout-vocab kickers */}
         <div className="mt-[26px] flex flex-col">
-          {LAWS.map((law) => {
+          {hiw.laws.map((law) => {
             const accent = law.gold ? "var(--color-gold-hi)" : "var(--color-brand)";
             return (
               <div key={law.kicker} className="border-t border-white/[0.08] py-[18px] first:border-t-0 first:pt-0">
@@ -137,25 +105,30 @@ export default function HowItWorksModal({ onClose }: { onClose: () => void }) {
         {/* what feeds the six — a compact readout that echoes the card's stat block */}
         <div className="mt-[24px] border-t border-white/[0.08] pt-[20px]">
           <div className="font-mono mb-[14px] text-[10.5px] font-bold tracking-[.2em] text-ink-faint">
-            WHAT FEEDS THE SIX
+            {hiw.readsKicker}
           </div>
           <div className="grid grid-cols-2 gap-x-[16px] gap-y-[13px] max-[440px]:grid-cols-1">
-            {READS.map((r) => (
-              <div key={r.abbr} className="flex items-start gap-[11px]">
-                <span className="font-display mt-[1px] w-[42px] flex-none rounded-[7px] bg-brand/15 py-[5px] text-center text-[13px] font-extrabold tracking-[.04em] text-brand">
-                  {r.abbr}
-                </span>
-                <span className="text-[13px] leading-[1.4] text-ink-faint">{r.gloss}</span>
-              </div>
-            ))}
+            {STAT_KEYS.map((k) => {
+              const stat = t.stat(k, locale);
+              return (
+                <div key={k} className="flex items-start gap-[11px]">
+                  <span className="font-display mt-[1px] w-[42px] flex-none rounded-[7px] bg-brand/15 py-[5px] text-center text-[13px] font-extrabold tracking-[.04em] text-brand">
+                    {stat.abbr}
+                  </span>
+                  <span className="text-[13px] leading-[1.4] text-ink-faint">{stat.gloss}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
         {/* the ladder — what you're chasing, low to legend */}
         <div className="mt-[24px] border-t border-white/[0.08] pt-[20px]">
-          <div className="font-mono mb-[13px] text-[10.5px] font-bold tracking-[.2em] text-ink-faint">THE LADDER</div>
+          <div className="font-mono mb-[13px] text-[10.5px] font-bold tracking-[.2em] text-ink-faint">
+            {hiw.ladderKicker}
+          </div>
           <div className="flex flex-wrap items-center gap-y-[8px]">
-            {LADDER.map((f, i) => (
+            {hiw.ladder.map((f, i) => (
               <span key={f.label} className="inline-flex items-center">
                 <span
                   className="font-display rounded-[7px] px-[11px] py-[5px] text-[12.5px] font-bold tracking-[.06em]"
@@ -163,7 +136,7 @@ export default function HowItWorksModal({ onClose }: { onClose: () => void }) {
                 >
                   {f.label}
                 </span>
-                {i < LADDER.length - 1 && (
+                {i < hiw.ladder.length - 1 && (
                   <span aria-hidden className="px-[7px] text-[11px] text-ink-mute">
                     →
                   </span>
@@ -171,9 +144,7 @@ export default function HowItWorksModal({ onClose }: { onClose: () => void }) {
               </span>
             ))}
           </div>
-          <p className="m-0 mt-[16px] text-[12px] leading-[1.5] text-ink-mute">
-            Read live from your public GitHub via the GraphQL API. No inputs, no edits — just the tape.
-          </p>
+          <p className="m-0 mt-[16px] text-[12px] leading-[1.5] text-ink-mute">{hiw.ladderFootnote}</p>
         </div>
       </div>
     </div>

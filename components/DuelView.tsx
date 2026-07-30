@@ -18,8 +18,10 @@ import { duelThemes, resolveCardTheme, rgba } from "./finishTheme";
 import { useDuelReveal } from "@/hooks/useReveal";
 import { useShareActions } from "@/hooks/useShareActions";
 import { resolvedRows } from "@/lib/reveal";
-import { formatCount } from "@/lib/format";
+import { formatCount } from "@/lib/i18n/format";
 import { duelIntentUrl, duelSharePayload, duelUrl } from "@/lib/share";
+import { useLocale } from "@/lib/i18n/useLocale";
+import { useUIDict } from "@/lib/i18n/hooks";
 
 const CARD_WIDTH = "clamp(150px, min(24vw, 34vh), 292px)";
 
@@ -151,6 +153,8 @@ export default function DuelView({
   duel: Duel;
   stars: number | null;
 }) {
+  const locale = useLocale();
+  const ui = useUIDict().duel;
   const { challenger, opponent, rows, winner, onPenalties, training } = duel;
   // Kit clash (see finishTheme): ONLY a toty/totw vs silver pairing recolors —
   // the toty side wears its saturated tier blue so the sides stay readable.
@@ -194,7 +198,7 @@ export default function DuelView({
   });
 
   const status =
-    !stamped && shown === 0 ? "KICK-OFF" : !stamped ? "LIVE" : "FULL TIME";
+    !stamped && shown === 0 ? ui.status.kickoff : !stamped ? ui.status.live : ui.status.fullTime;
 
   // Both header names share one size — the longer login sets it (a fixture
   // reads as one pair, not two weights) — shrinking smoothly for long handles
@@ -350,7 +354,7 @@ export default function DuelView({
                 size={16}
                 className="transition-transform group-hover:translate-x-0.5"
               />
-              GET SCOUTED
+              {ui.backHome}
             </Link>
             <Mascot size={40} kick={false} ball={false} animate={false} />
           </div>
@@ -363,7 +367,7 @@ export default function DuelView({
             the names mirror outward from it. */}
         <header className="mt-[clamp(6px,1.6vh,14px)] text-center">
           <div className="font-display text-[12px] font-bold tracking-[.3em] text-brand">
-            SCOUT DUEL
+            {ui.kicker}
           </div>
           <h1 className="font-display mt-[6px] grid grid-cols-[1fr_auto_1fr] items-center gap-[clamp(8px,2vw,18px)] font-black leading-[.95]">
             <span
@@ -403,7 +407,7 @@ export default function DuelView({
               )}
               {status}
               {stamped && onPenalties && (
-                <span className="text-gold-hi">· PENS</span>
+                <span className="text-gold-hi">· {ui.status.afterPenalties}</span>
               )}
             </div>
 
@@ -420,7 +424,7 @@ export default function DuelView({
                 <span className="tabular-nums" style={{ color: aTheme.ink }}>
                   {pctA}%
                 </span>
-                <span>DOMINANCE</span>
+                <span>{ui.dominance}</span>
                 <span className="tabular-nums" style={{ color: bTheme.ink }}>
                   {100 - pctA}%
                 </span>
@@ -520,7 +524,7 @@ export default function DuelView({
                       </div>
                     ) : (
                       <div className="font-display text-[clamp(28px,4.4vw,48px)] font-black leading-[.92] text-ink">
-                        {training ? "A DRAW. OBVIOUSLY." : "ALL SQUARE"}
+                        {training ? ui.drawHeadline.training : ui.drawHeadline.match}
                       </div>
                     )}
                   </div>
@@ -539,12 +543,15 @@ export default function DuelView({
                   {/* the how */}
                   <div className="mt-[9px] text-[12.5px] leading-snug text-ink-soft">
                     {winnerCard && onPenalties
-                      ? `dead level — ${winnerCard.overall} OVR settles it from the spot`
+                      ? ui.howWin.penalties({ overall: winnerCard.overall })
                       : winnerCard
-                        ? `${duel.score[winner!]}–${duel.score[winner === "challenger" ? "opponent" : "challenger"]} across the six stats`
+                        ? ui.howWin.scoreAcross({
+                            scoreWinner: duel.score[winner!],
+                            scoreLoser: duel.score[winner === "challenger" ? "opponent" : "challenger"],
+                          })
                         : training
-                          ? "you can't nutmeg yourself"
-                          : "six stats, nothing between them — rematch demanded"}
+                          ? ui.howWin.cantNutmeg
+                          : ui.howWin.drawCall}
                   </div>
                 </div>
               ) : (
@@ -553,7 +560,7 @@ export default function DuelView({
                   onClick={skip}
                   className="text-[11.5px] font-medium text-ink-mute transition hover:text-ink-soft"
                 >
-                  tap anywhere to skip
+                  {ui.skipHint}
                 </button>
               )}
             </div>
@@ -575,7 +582,7 @@ export default function DuelView({
                     style={{ background: aTheme.ink }}
                   />
                   <h3 className="font-display text-[11px] font-bold tracking-[.22em] text-ink-faint">
-                    THE RECEIPTS
+                    {ui.receiptsHeader}
                   </h3>
                   <span
                     className="h-[2px] w-[16px] rounded-full"
@@ -589,13 +596,13 @@ export default function DuelView({
                     className="grid grid-cols-[1fr_auto_1fr] items-baseline gap-[10px] border-b border-white/[0.06] py-[7px] last:border-0"
                   >
                     <span className="text-right font-mono text-[13px] tabular-nums text-ink-dim">
-                      {formatCount(r.challenger)}
+                      {formatCount(r.challenger, locale)}
                     </span>
                     <span className="w-[124px] text-center text-[11px] text-ink-mute">
                       {r.label}
                     </span>
                     <span className="text-left font-mono text-[13px] tabular-nums text-ink-dim">
-                      {formatCount(r.opponent)}
+                      {formatCount(r.opponent, locale)}
                     </span>
                   </div>
                 ))}
@@ -614,7 +621,7 @@ export default function DuelView({
                       className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/35 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full"
                     />
                     <Share2 size={17} strokeWidth={2.5} className="relative" />
-                    <span className="relative">SHARE THE DUEL</span>
+                    <span className="relative">{ui.share.shareDuel}</span>
                   </button>
                 )}
                 <div className="grid w-full grid-cols-3 gap-[8px]">
@@ -627,8 +634,8 @@ export default function DuelView({
                         "noopener,noreferrer",
                       )
                     }
-                    title="Share on X"
-                    aria-label="Share on X"
+                    title={ui.share.shareX}
+                    aria-label={ui.share.shareX}
                     className="group flex items-center justify-center gap-[7px] rounded-xl border border-line bg-white/[0.03] py-[11px] text-[12.5px] font-semibold text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-white/25 hover:bg-white/[0.07] hover:text-white active:translate-y-0 active:scale-[.98]"
                   >
                     <XLogo size={14} />
@@ -637,8 +644,8 @@ export default function DuelView({
                   <button
                     type="button"
                     onClick={copyLink}
-                    title="Copy link to this duel"
-                    aria-label="Copy link to this duel"
+                    title={ui.share.copyLinkTitle}
+                    aria-label={ui.share.copyLinkAria}
                     className="group flex items-center justify-center gap-[7px] rounded-xl border border-line bg-white/[0.03] py-[11px] text-[12.5px] font-semibold text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-brand/50 hover:bg-brand/[0.08] hover:text-white active:translate-y-0 active:scale-[.98]"
                   >
                     {linkCopied ? (
@@ -647,17 +654,17 @@ export default function DuelView({
                       <Link2 size={14} />
                     )}
                     <span className="max-[360px]:hidden">
-                      {linkCopied ? "Copied" : "Copy link"}
+                      {linkCopied ? ui.share.copied : ui.share.copyLink}
                     </span>
                   </button>
                   <Link
                     href={`/${opponent.login}/vs/${challenger.login}`}
-                    title="Rematch with the corners swapped"
-                    aria-label="Rematch with the corners swapped"
+                    title={ui.share.rematchTitle}
+                    aria-label={ui.share.rematchTitle}
                     className="group flex items-center justify-center gap-[7px] rounded-xl border border-line bg-white/[0.03] py-[11px] text-[12.5px] font-semibold text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-white/25 hover:bg-white/[0.07] hover:text-white active:translate-y-0 active:scale-[.98]"
                   >
                     <Repeat size={14} />
-                    <span className="max-[360px]:hidden">Swap corners</span>
+                    <span className="max-[360px]:hidden">{ui.share.swapCorners}</span>
                   </Link>
                 </div>
               </div>

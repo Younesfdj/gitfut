@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { useLocale } from "@/lib/i18n/useLocale";
+import { useUIDict } from "@/lib/i18n/hooks";
 
 // Last-resort boundary: a throw in the root layout itself escapes app/error.tsx,
 // so this replaces the entire document (it must render its own <html>/<body>).
@@ -18,8 +20,15 @@ export default function GlobalError({
     console.error("[gitfut] global error:", error);
   }, [error]);
 
+  // GlobalError renders before the LocaleProvider mounts, so useLocale() may
+  // not have a value. Fall back to ENGLISH silently — global errors are rare
+  // and the user can still resolve the message.
+  const locale = useLocale();
+  const ui = useUIDict().errors;
+  void locale;
+
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body
         style={{
           margin: 0,
@@ -36,9 +45,9 @@ export default function GlobalError({
       >
         <div style={{ maxWidth: 460 }}>
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.3em", color: "#39d353" }}>GITFUT</div>
-          <h1 style={{ margin: "14px 0 0", fontSize: 34, fontWeight: 800, lineHeight: 1.05 }}>Match abandoned</h1>
+          <h1 style={{ margin: "14px 0 0", fontSize: 34, fontWeight: 800, lineHeight: 1.05 }}>{ui.globalTitle}</h1>
           <p style={{ margin: "14px 0 0", fontSize: 15.5, lineHeight: 1.5, color: "#a8b3bd" }}>
-            Something went badly wrong. Reload to get back to the pitch.
+            {ui.globalBody}
           </p>
           <button
             onClick={reset}
@@ -56,7 +65,7 @@ export default function GlobalError({
               cursor: "pointer",
             }}
           >
-            RELOAD
+            {locale === "ko" ? "새로고침" : "RELOAD"}
           </button>
           {error.digest && (
             <p

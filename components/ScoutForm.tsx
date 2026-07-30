@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import Mascot from "./Mascot";
+import { useLocale } from "@/lib/i18n/useLocale";
+import { useUIDict } from "@/lib/i18n/hooks";
+import { formatInt } from "@/lib/i18n/format";
 
 interface Props {
   loading: boolean;
@@ -22,6 +25,9 @@ export default function ScoutForm({
   onScout,
   onOpenModal,
 }: Props) {
+  const locale = useLocale();
+  const ui = useUIDict();
+  const sf = ui.scoutForm;
   const [name, setName] = useState("");
 
   const submit = (e: React.FormEvent) => {
@@ -52,11 +58,11 @@ export default function ScoutForm({
       </div>
 
       <h1 className="font-display m-0 mb-3 text-[clamp(52px,7vw,104px)] leading-[.82] tracking-[.005em]">
-        GET SCOUTED<span className="text-brand">.</span>
+        {sf.headline}
+        <span className="text-brand">.</span>
       </h1>
       <p className="mb-[26px] max-w-[420px] text-[clamp(15px,1.7vw,18px)] font-medium leading-[1.5] text-ink-dim max-[860px]:mx-auto">
-        Your GitHub stats, turned into a World-Cup-style player card rated out
-        of 99.
+        {sf.subhead}
       </p>
 
       <form
@@ -64,15 +70,14 @@ export default function ScoutForm({
         className="m-0 flex max-w-[460px] flex-wrap gap-[10px] max-[860px]:mx-auto"
       >
         <div className="relative min-w-[200px] flex-1">
-          <span className="font-mono pointer-events-none absolute left-[18px] top-1/2 -translate-y-1/2 text-[17px] font-semibold text-brand/70"></span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="github username"
+            placeholder={sf.inputPlaceholder}
             autoComplete="off"
             spellCheck={false}
-            aria-label="GitHub username"
-            className="font-mono h-14 w-full rounded-[14px] border-[1.5px] border-line bg-surface/70 pl-[34px] pr-5 text-[16px] font-medium text-white outline-none backdrop-blur-[4px] transition focus:border-brand focus:bg-surface focus:shadow-[0_0_0_4px_rgba(57,211,83,.16),0_0_42px_rgba(57,211,83,.24)]"
+            aria-label={sf.inputAriaLabel}
+            className="font-mono h-14 w-full rounded-[14px] border-[1.5px] border-line bg-surface/70 px-[18px] text-[16px] font-medium text-white outline-none backdrop-blur-[4px] transition focus:border-brand focus:bg-surface focus:shadow-[0_0_0_4px_rgba(57,211,83,.16),0_0_42px_rgba(57,211,83,.24)]"
           />
         </div>
         <button
@@ -80,7 +85,7 @@ export default function ScoutForm({
           disabled={loading}
           className="font-display group flex h-14 items-center gap-2 rounded-[14px] bg-gradient-to-b from-brand to-brand-mid px-7 text-[20px] tracking-[.06em] text-[#04130a] shadow-[0_0_0_1px_rgba(57,211,83,.4),0_10px_30px_rgba(57,211,83,.3)] transition hover:from-brand-hi hover:to-brand disabled:cursor-wait disabled:opacity-75"
         >
-          {loading ? "SCOUTING…" : "SCOUT"}
+          {loading ? sf.submitting : sf.submit}
           {!loading && (
             <ArrowRight
               size={19}
@@ -101,7 +106,7 @@ export default function ScoutForm({
       )}
 
       <div className="mt-[14px] text-[13px] text-ink-mute">
-        try{" "}
+        {sf.tryPrefix}{" "}
         <button
           type="button"
           onClick={() => onScout("torvalds")}
@@ -117,7 +122,7 @@ export default function ScoutForm({
         >
           sindresorhus
         </button>{" "}
-        · or your own
+        · {sf.tryOrYourOwn}
       </div>
 
       {/* live tally — a broadcast-style scoreboard count; the number is the
@@ -131,9 +136,9 @@ export default function ScoutForm({
                 <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-brand" />
               </span>
               <span className="font-display text-[20px] leading-none tabular-nums text-ink">
-                {scoutCount.toLocaleString("en-US")}
+                {formatInt(scoutCount, locale)}
               </span>
-              <span className="text-[12px] text-ink-mute">cards rated</span>
+              <span className="text-[12px] text-ink-mute">{sf.cardsRated}</span>
             </span>
             <span aria-hidden className="h-[12px] w-px bg-white/[0.12] max-[860px]:hidden" />
           </>
@@ -143,7 +148,7 @@ export default function ScoutForm({
           onClick={onOpenModal}
           className="cursor-pointer text-[12.5px] font-semibold text-ink-soft underline-offset-2 transition hover:text-brand hover:underline"
         >
-          how it works ↗
+          {sf.howItWorks} ↗
         </button>
       </div>
     </div>

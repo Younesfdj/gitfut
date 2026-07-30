@@ -1,4 +1,6 @@
-import { formatCount } from "../format";
+import { formatCount } from "../i18n/format";
+import { t } from "../i18n/t";
+import type { Locale } from "../i18n";
 import { STATS } from "./constants";
 import type { Metric, Signals, Stats, WorkRateLevel } from "./types";
 
@@ -12,62 +14,68 @@ const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x
 const score99 = (value: number, ref: number) =>
   value <= 0 ? 0 : clamp(Math.round(99 * (Lg(value) / Lg(ref))), 1, 99);
 
-// Skill moves (1–5) = technical range: language diversity, +1 for broad output.
-export function deriveSkillMoves(s: Signals): { value: number; reason: string } {
+export function deriveSkillMoves(s: Signals, locale: Locale = "en") {
   let value = s.languages >= 10 ? 5 : s.languages >= 7 ? 4 : s.languages >= 4 ? 3 : s.languages >= 2 ? 2 : 1;
   const bonus = s.public_repos >= 40 && value < 5;
   if (bonus) value += 1;
-  const reason = `Technical range: ${s.languages} language${s.languages === 1 ? "" : "s"}${
-    bonus ? ` across ${formatCount(s.public_repos)} repos` : ""
-  }.`;
+  const reason = t.attribute.skillMoves(
+    value,
+    s.languages,
+    bonus,
+    formatCount(s.public_repos, locale),
+  );
   return { value, reason };
 }
 
-// Weak foot (1–5) = off-foot ability: how strong your WEAKER areas are (average
-// of the three lowest stats), so a one-trick profile rates low.
-export function deriveWeakFoot(stats: Stats): { value: number; reason: string } {
+export function deriveWeakFoot(stats: Stats, locale: Locale = "en") {
   const sorted = STATS.map((k) => stats[k]).sort((a, b) => a - b);
   const weakSide = Math.round((sorted[0] + sorted[1] + sorted[2]) / 3);
   const value = weakSide >= 72 ? 5 : weakSide >= 63 ? 4 : weakSide >= 54 ? 3 : weakSide >= 45 ? 2 : 1;
-  return { value, reason: `Off-foot: your three weakest stats average ${weakSide}/99.` };
+  const reason = t.attribute.weakFoot(weakSide);
+  return { value, reason };
 }
 
 const rate = (v: number): WorkRateLevel => (v >= 68 ? "High" : v >= 50 ? "Med" : "Low");
 
-// Work rate: attack = shipping output (PAC/SHO), defense = maintenance (DEF).
-export function deriveWorkRate(stats: Stats): { attack: WorkRateLevel; defense: WorkRateLevel; reason: string } {
+export function deriveWorkRate(stats: Stats, locale: Locale = "en") {
   const attack = rate(Math.round((stats.pac + stats.sho) / 2));
   const defense = rate(stats.def);
-  return {
-    attack,
-    defense,
-    reason: `Attack ${attack} from shipping output (commits, stars); defense ${defense} from reviews & issues.`,
-  };
+  const reason = t.workRate_reason(locale, attack, defense);
+  return { attack, defense, reason };
 }
 
-// Style: a one-word read of the recent activity pattern.
-export function deriveStyle(s: Signals): { value: string; reason: string } {
-  if (s.recent_spike) return { value: "Explosive", reason: "A recent burst well above your usual pace." };
-  if (s.active_days_recent >= 200 && s.recent_contributions >= 800)
-    return { value: "Relentless", reason: "Active on most days, all year round." };
-  if (s.account_age_years >= 6 && s.active_years >= 5)
-    return { value: "Controlled", reason: "A long, steady track record." };
-  if (s.max_repo_stars >= 5000 && s.recent_contributions < 200)
-    return { value: "Clinical", reason: "One big hit, quiet lately." };
-  if (s.recent_contributions >= 300) return { value: "Industrious", reason: "Steadily active this year." };
-  return { value: "Measured", reason: "Light recent activity." };
-}
+// Source-of-truth for metric keys: every key here MUST exist in the i18n
+// dictionary's `metrics`. The reverse direction is fine (extra dict keys are
+// unused until referenced here).
+type MetricKey =
+  | "commits"
+  | "starsEarned"
+  | "topRepoReach"
+  | "pullRequests"
+  | "followers"
+  | "languages"
+  | "issues"
+  | "codeReviews"
+  | "contributions"
+  | "accountAge"
+  | "activeDays"
+  | "repositories"
+  | "activeYears";
 
-interface MetricDef {
-  label: string;
-  unit: string;
-  ref: number; // value that maps to ~99
-  value: (s: Signals) => number;
-}
-
-// Canonical metric display labels — the single source for every surface that
+// Canonical metric display keys — the single source for every surface that
 // looks a metric up by label (the scout report renders them; lib/duel reads
-// receipts back through them). Renaming here flows everywhere at compile time.
+// receipts back through them). The actual labels (commits/stars/etc.) are
+// locale-dependent and live in lib/i18n/dict/<locale>.ts `metrics`. We keep
+// the bare keys here as the canonical vocabulary so duel.ts and tests can
+// reference them by name without importing the dictionary directly.
+// Canonical metric DISPLAY labels — the single source for every surface that
+// looks a metric up by label (the scout report renders them; lib/duel reads
+// receipts back through them; legacy tests assert against these strings).
+// Authors add a key here ONCE; an additional row in the i18n dictionary
+// `metrics` block ensures non-EN locales can override. Calls in code that
+// need a label-by-locale string should call `t.metric(key, locale)` instead.
+//
+// Renaming here flows everywhere at compile time.
 export const METRIC_LABELS = {
   commits: "Commits",
   starsEarned: "Stars earned",
@@ -80,42 +88,60 @@ export const METRIC_LABELS = {
   contributions: "Contributions",
 } as const;
 
-// Core metrics — always shown (a few zeros are fine).
+interface MetricDef {
+  key: MetricKey;
+  ref: number;
+  value: (s: Signals) => number;
+}
+
 const CORE_METRICS: MetricDef[] = [
-  { label: METRIC_LABELS.commits, unit: "commits", ref: 3_000, value: (s) => s.recent_commits },
-  { label: METRIC_LABELS.starsEarned, unit: "stars", ref: 200_000, value: (s) => s.total_stars_owned },
-  { label: METRIC_LABELS.topRepoReach, unit: "stars", ref: 150_000, value: (s) => s.max_repo_stars },
-  { label: METRIC_LABELS.pullRequests, unit: "PRs", ref: 2_000, value: (s) => s.prs_to_others },
-  { label: METRIC_LABELS.followers, unit: "followers", ref: 100_000, value: (s) => s.followers },
-  { label: METRIC_LABELS.languages, unit: "languages", ref: 15, value: (s) => s.languages },
-  { label: METRIC_LABELS.issues, unit: "issues", ref: 1_500, value: (s) => s.issues_closed },
-  { label: METRIC_LABELS.codeReviews, unit: "reviews", ref: 2_000, value: (s) => s.reviews },
-  { label: METRIC_LABELS.contributions, unit: "contributions", ref: 50_000, value: (s) => s.total_contributions_lifetime },
+  { key: "commits", ref: 3_000, value: (s) => s.recent_commits },
+  { key: "starsEarned", ref: 200_000, value: (s) => s.total_stars_owned },
+  { key: "topRepoReach", ref: 150_000, value: (s) => s.max_repo_stars },
+  { key: "pullRequests", ref: 2_000, value: (s) => s.prs_to_others },
+  { key: "followers", ref: 100_000, value: (s) => s.followers },
+  { key: "languages", ref: 15, value: (s) => s.languages },
+  { key: "issues", ref: 1_500, value: (s) => s.issues_closed },
+  { key: "codeReviews", ref: 2_000, value: (s) => s.reviews },
+  { key: "contributions", ref: 50_000, value: (s) => s.total_contributions_lifetime },
 ];
 
-// Optional metrics — appended only to make up for zeroed core ones (see below).
-// Display-only, like the core metrics: they don't feed playstyles or attributes.
 const OPTIONAL_METRICS: MetricDef[] = [
-  { label: "Account age", unit: "yrs", ref: 15, value: (s) => Math.round(s.account_age_years) },
-  { label: "Active days", unit: "days", ref: 365, value: (s) => s.active_days_recent },
-  { label: "Repositories", unit: "repos", ref: 200, value: (s) => s.public_repos },
-  { label: "Active years", unit: "yrs", ref: 15, value: (s) => s.active_years },
+  { key: "accountAge", ref: 15, value: (s) => Math.round(s.account_age_years) },
+  { key: "activeDays", ref: 365, value: (s) => s.active_days_recent },
+  { key: "repositories", ref: 200, value: (s) => s.public_repos },
+  { key: "activeYears", ref: 15, value: (s) => s.active_years },
 ];
 
-const toMetric = (def: MetricDef, s: Signals): Metric => {
+const toMetric = (def: MetricDef, s: Signals, locale: Locale): Metric => {
   const value = def.value(s);
-  return { label: def.label, value, unit: def.unit, score: score99(value, def.ref) };
+  const dict = t.metric(def.key, locale);
+  return { label: dict.label, value, unit: dict.unit, score: score99(value, def.ref) };
 };
 
 // Detail metrics: the core bars with any ZEROED ones hidden, plus one optional
 // (non-zero) filler for every zeroed core metric beyond the first — so a sparse
 // profile shows real data (age, active days, repos…) instead of zeros.
-export function deriveMetrics(s: Signals): Metric[] {
-  const core = CORE_METRICS.map((d) => toMetric(d, s));
+export function deriveMetrics(s: Signals, locale: Locale = "en"): Metric[] {
+  const core = CORE_METRICS.map((d) => toMetric(d, s, locale));
   const shown = core.filter((m) => m.value > 0); // hide zeroed core metrics
   const fillerCount = Math.max(0, core.length - shown.length - 1);
-  const fillers = OPTIONAL_METRICS.map((d) => toMetric(d, s))
+  const fillers = OPTIONAL_METRICS.map((d) => toMetric(d, s, locale))
     .filter((m) => m.value > 0)
     .slice(0, fillerCount);
   return [...shown, ...fillers];
+}
+
+export function deriveStyle(s: Signals, locale: Locale = "en") {
+  // 1) Pick the bucket using pure data (locale-independent),
+  // 2) Pull the localized label + reason from the dictionary.
+  let key: "Explosive" | "Relentless" | "Controlled" | "Clinical" | "Industrious" | "Measured";
+  if (s.recent_spike) key = "Explosive";
+  else if (s.active_days_recent >= 200 && s.recent_contributions >= 800) key = "Relentless";
+  else if (s.account_age_years >= 6 && s.active_years >= 5) key = "Controlled";
+  else if (s.max_repo_stars >= 5000 && s.recent_contributions < 200) key = "Clinical";
+  else if (s.recent_contributions >= 300) key = "Industrious";
+  else key = "Measured";
+  const dict = t.style(key, locale);
+  return { value: dict.value, reason: dict.reason };
 }

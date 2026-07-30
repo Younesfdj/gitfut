@@ -3,6 +3,8 @@ import { topLanguageLogo } from "../github/languages";
 import { deriveMetrics, deriveSkillMoves, deriveStyle, deriveWeakFoot, deriveWorkRate } from "./attributes";
 import { ATTACK_STATS, FINISH_LABELS, FOUNDER_OVERALL, FOUNDERS, K, STATS, WEIGHTS } from "./constants";
 import { derivePlaystyles } from "./playstyles";
+import { t } from "../i18n/t";
+import type { Locale } from "../i18n";
 import type {
   Archetype,
   Card,
@@ -144,32 +146,32 @@ function pickFinish(overall: number, L: number, recentSpike: boolean, login: str
   return "bronze";
 }
 
-function archetypeFromShape(st: Stats, finish: Finish): Archetype {
+function archetypeFromShape(st: Stats, finish: Finish, locale: Locale = "en"): Archetype {
   if (finish === "icon")
-    return { name: "Galáctico", blurb: "hall-of-fame maintainer — high and balanced, earned over years" };
+    return t.archetype("galactico", locale);
   const top = [...STATS].sort((a, b) => st[b] - st[a]);
   const peak = st[top[0]];
   const top2 = top.slice(0, 2);
   const has = (a: StatKey, b: StatKey) => top2.includes(a) && top2.includes(b);
   if (top[0] === "sho" && st.def < peak - 18 && st.pas < peak - 12)
-    return { name: "Poacher", blurb: "one viral repo, clinical — a pure star-magnet finisher" };
+    return t.archetype("poacher", locale);
   if (top[0] === "pas" && top2.includes("def"))
-    return { name: "Regista", blurb: "deep playmaker — coordinates from the back with cross-repo PRs and reviews" };
+    return t.archetype("regista", locale);
   if (top[0] === "def" && top2.includes("pas"))
-    return { name: "Libero", blurb: "ball-playing sweeper — a reviewer who also builds, keeping the codebase clean" };
+    return t.archetype("libero", locale);
   if (top[0] === "dri")
-    return { name: "Fantasista", blurb: "the magician — a polyglot working across many stacks" };
-  if (has("phy", "sho")) return { name: "Target Man", blurb: "a prolific shipper whose output lands" };
+    return t.archetype("fantasista", locale);
+  if (has("phy", "sho")) return t.archetype("targetman", locale);
   if (has("phy", "pac") || has("pac", "dri"))
-    return { name: "Mezzala", blurb: "the engine — a relentless box-to-box daily-driver" };
+    return t.archetype("mezzala", locale);
   if (top[0] === "def")
-    return { name: "Libero", blurb: "ball-playing sweeper — a reviewer who also builds, keeping the codebase clean" };
+    return t.archetype("libero", locale);
   if (top[0] === "sho")
-    return { name: "Poacher", blurb: "one viral repo, clinical — a pure star-magnet finisher" };
-  return { name: "Mezzala", blurb: "the engine — a relentless box-to-box daily-driver" };
+    return t.archetype("poacher", locale);
+  return t.archetype("mezzala", locale);
 }
 
-export function buildCard(s: Signals): Card {
+export function buildCard(s: Signals, locale: Locale = "en"): Card {
   const stats = spike(applyTension(zscore(rawStats(s))), center(s));
   const { position, family } = positionFromShape(stats);
   const baseOVR = weightedOVR(stats, family);
@@ -184,12 +186,12 @@ export function buildCard(s: Signals): Card {
     : clamp(baseOVR + Math.round(K.legacy.bonusMax * L), 1, 99);
   const finish: Finish = founder ? "founder" : pickFinish(overall, L, s.recent_spike, s.login);
   const archetype = founder
-    ? { name: "Founder", blurb: "co-founder of GitFut — they built the very scout reading this card" }
-    : archetypeFromShape(stats, finish);
-  const skill = deriveSkillMoves(s);
-  const weak = deriveWeakFoot(stats);
-  const work = deriveWorkRate(stats);
-  const style = deriveStyle(s);
+    ? t.archetype("founder", locale)
+    : archetypeFromShape(stats, finish, locale);
+  const skill = deriveSkillMoves(s, locale);
+  const weak = deriveWeakFoot(stats, locale);
+  const work = deriveWorkRate(stats, locale);
+  const style = deriveStyle(s, locale);
   // Headline language's own catalog logo (null when it has none) — never a
   // different language's icon, so the logo always matches `topLanguage`.
   const languageLogo = topLanguageLogo(s.rankedLanguages ?? []);
@@ -205,7 +207,7 @@ export function buildCard(s: Signals): Card {
     baseOVR,
     overall,
     finish,
-    finishLabel: FINISH_LABELS[finish],
+    finishLabel: t.finishLabel(finish, locale),
     archetype: archetype.name,
     archetypeBlurb: archetype.blurb,
     topLanguage: s.topLanguage ?? null,
@@ -223,8 +225,8 @@ export function buildCard(s: Signals): Card {
         workRate: work.reason,
         style: style.reason,
       },
-      playstyles: derivePlaystyles(s),
-      metrics: deriveMetrics(s),
+      playstyles: derivePlaystyles(s, locale),
+      metrics: deriveMetrics(s, locale),
     },
   };
 }

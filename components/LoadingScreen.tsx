@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Mascot from "./Mascot";
-import { punAt } from "@/lib/puns";
+import { useLocale } from "@/lib/i18n/useLocale";
+import { t } from "@/lib/i18n/t";
 
 // Full-screen loading state shown while the card image is generated. Mascot
 // juggles the WC26 ball; a football-git pun rotates every ~1.8s.
 export default function LoadingScreen({ login }: { login?: string }) {
+  const locale = useLocale();
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 1800);
+    const id = setInterval(() => setTick((n) => n + 1), 1800);
     return () => clearInterval(id);
   }, []);
 
@@ -19,7 +21,9 @@ export default function LoadingScreen({ login }: { login?: string }) {
       <Mascot size={220} kick ball />
 
       <div className="font-display mt-8 text-[clamp(30px,5vw,52px)] leading-none tracking-[.02em] text-ink">
-        SCOUTING{" "}
+        {/* "SCOUTING" — stamped in display caps. Locked EN because the brand
+            word is part of the visual identity, not localizable copy. */}
+        {t("@ui.scoutForm.submitting", locale).replace("…", "")}
         {login && <span className="font-mono align-middle text-[0.5em] text-brand">@{login}</span>}
       </div>
 
@@ -29,7 +33,7 @@ export default function LoadingScreen({ login }: { login?: string }) {
         className="animate-pun-in mt-3 h-6 text-[15px] font-medium text-ink-soft"
         aria-live="polite"
       >
-        {punAt(tick)}
+        {t.pun(tick, locale)}
       </p>
 
       {/* indeterminate progress sliver */}

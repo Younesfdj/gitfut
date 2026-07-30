@@ -5,6 +5,8 @@ import { Pencil, Plus, Search, X } from "lucide-react";
 import { flagPickerList } from "@/lib/wc26";
 import { comboboxReducer, initialComboboxState } from "@/lib/comboboxNav";
 import { useClickOutside } from "@/hooks/useClickOutside";
+import { useLocale } from "@/lib/i18n/useLocale";
+import { t as translator } from "@/lib/i18n/t";
 
 interface Props {
   /** Current flag (ISO 3166-1 alpha-2, lowercase) or "" / null for none. */
@@ -32,6 +34,7 @@ const SLOT = { left: "17.59%", top: "33.17%", width: "14.81%", height: "5.73%" }
 export default function FlagPicker({ value, onChange }: Props) {
   const [state, dispatch] = useReducer(comboboxReducer, initialComboboxState);
   const { open, query, active } = state;
+  const locale = useLocale();
 
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -246,7 +249,7 @@ export default function FlagPicker({ value, onChange }: Props) {
                     loading="lazy"
                     className="h-[18px] w-[24px] flex-none rounded-[2px] object-cover shadow-[0_0_0_1px_rgba(255,255,255,.07)]"
                   />
-                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{translator.countryName(c.code, locale)}</span>
                   <span className="font-mono text-[11px] uppercase tracking-[.08em] text-ink-mute">
                     {c.code}
                   </span>
