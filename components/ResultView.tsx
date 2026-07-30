@@ -20,6 +20,8 @@ import DistributionPanel from "./DistributionPanel";
 import { confettiPalette, resolveCardTheme, resolveResultTheme } from "./finishTheme";
 import { useReveal } from "@/hooks/useReveal";
 import { burstConfetti } from "@/lib/confetti";
+import { useLocale } from "@/lib/i18n/useLocale";
+import { useUIDict } from "@/lib/i18n/hooks";
 
 const HowItWorksModal = dynamic(() => import("./HowItWorksModal"), { ssr: false });
 
@@ -45,6 +47,13 @@ export default function ResultView({
   stars,
   canonicalCountry = "",
 }: Props) {
+  const locale = useLocale();
+  const ui = useUIDict();
+  const sf = ui.scoutForm;
+  const rBack = ui.result.back;
+  const rBackHome = ui.result.backHome;
+  const rHow = sf.howItWorks;
+  void locale; // Reserved for FlagPicker/CardActions follow-ups.
   const captureRef = useRef<HTMLDivElement>(null);
   const storyRef = useRef<HTMLDivElement>(null);
   const theme = resolveResultTheme(card);
@@ -107,12 +116,12 @@ export default function ResultView({
             {seenHome ? (
               <>
                 <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
-                BACK
+                {rBack}
               </>
             ) : (
               <>
                 <ArrowLeft size={16} className="transition-transform group-hover:translate-x-0.5" />
-                GET SCOUTED
+                {rBackHome}
               </>
             )}
           </button>
@@ -124,7 +133,7 @@ export default function ResultView({
             onClick={() => setModalOpen(true)}
             className="cursor-pointer text-[12.5px] font-semibold text-ink-soft underline-offset-2 transition hover:text-brand hover:underline max-[420px]:hidden"
           >
-            how it works ↗
+            {rHow} ↗
           </button>
           <GithubStar stars={stars ?? null} />
         </div>

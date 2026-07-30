@@ -106,5 +106,5 @@ const RAW: Signals[] = [
   },
 ];
 
-export const SAMPLE_CARDS: Card[] = RAW.map(buildCard);
+export const SAMPLE_CARDS: Card[] = RAW.map((s) => buildCard(s));
 export const SAMPLE_LOGINS = RAW.map((r) => r.login);

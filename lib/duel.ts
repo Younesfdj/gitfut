@@ -1,6 +1,8 @@
 import type { Card, StatKey } from "./scoring/types";
 import { METRIC_LABELS } from "./scoring/attributes";
-import { STAT_LABELS, STATS } from "./scoring/constants";
+import { STATS } from "./scoring/constants";
+import { t } from "./i18n/t";
+import type { Locale } from "./i18n";
 
 export type DuelSide = "challenger" | "opponent";
 
@@ -35,14 +37,21 @@ export interface Duel {
   sharedPlaystyles: string[];
 }
 
-const RECEIPTS: { metric: string; label: string }[] = [
-  { metric: METRIC_LABELS.commits, label: "Commits this year" },
-  { metric: METRIC_LABELS.starsEarned, label: "Stars earned" },
-  { metric: METRIC_LABELS.pullRequests, label: "Pull requests" },
-  { metric: METRIC_LABELS.followers, label: "Followers" },
-  { metric: METRIC_LABELS.codeReviews, label: "Code reviews" },
-  { metric: METRIC_LABELS.contributions, label: "Lifetime contributions" },
-];
+/**
+ * Receipt metrics are looked up by EN METRIC_LABELS key (the canonical
+ * vocabulary), and the locale-specific label is applied at render time via
+ * `t.duelReceiptLabel(k, locale)`. We keep the EN string here as the lookup
+ * key so the rest of the duel pipeline (computeDuel receipts) doesn't need
+ * to know about locales at all.
+ */
+const RECEIPT_KEYS = [
+  "commits",
+  "starsEarned",
+  "pullRequests",
+  "followers",
+  "codeReviews",
+  "contributions",
+] as const;
 
 const metricValue = (card: Card, label: string): number =>
   card.report.metrics.find((m) => m.label === label)?.value ?? 0;
@@ -85,7 +94,7 @@ export function dominanceShare(rows: DuelRow[]): number {
   return Math.round((ROW_WEIGHT * rowShare + (1 - ROW_WEIGHT) * marginShare) * 100);
 }
 
-export function computeDuel(challenger: Card, opponent: Card): Duel {
+export function computeDuel(challenger: Card, opponent: Card, locale: Locale = "en"): Duel {
   const training =
     challenger.login.toLowerCase() === opponent.login.toLowerCase();
 
@@ -94,7 +103,7 @@ export function computeDuel(challenger: Card, opponent: Card): Duel {
     const b = opponent.stats[key];
     return {
       key,
-      label: STAT_LABELS[key],
+      label: t.duelStatRow(key, locale),
       challenger: a,
       opponent: b,
       winner: a === b ? null : a > b ? "challenger" : "opponent",
@@ -120,10 +129,12 @@ export function computeDuel(challenger: Card, opponent: Card): Duel {
     }
   }
 
-  const receipts: DuelReceipt[] = RECEIPTS.map(({ metric, label }) => ({
-    label,
-    challenger: metricValue(challenger, metric),
-    opponent: metricValue(opponent, metric),
+  const receipts: DuelReceipt[] = RECEIPT_KEYS.map((key) => ({
+    // Localized label, but key the metric lookup off the canonical English
+    // label so the metric-find below keeps working without a second pass.
+    label: t.duelReceiptLabel(key, locale),
+    challenger: metricValue(challenger, METRIC_LABELS[key]),
+    opponent: metricValue(opponent, METRIC_LABELS[key]),
   }));
 
   const opponentStyles = new Set(opponent.report.playstyles.map((p) => p.name));

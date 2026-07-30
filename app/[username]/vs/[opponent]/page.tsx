@@ -9,6 +9,7 @@ import { getRepoStars } from "@/lib/github/stars";
 import { pickFlag } from "@/lib/flagPriority";
 import { recordScout } from "@/lib/analytics";
 import { computeDuel } from "@/lib/duel";
+import { resolveServerLocale } from "@/lib/i18n/server";
 import type { Card } from "@/lib/scoring/types";
 
 export const dynamic = "force-dynamic"; // per-user, token-gated, always fresh
@@ -120,7 +121,8 @@ export default async function Page({ params }: Params) {
 
   after(() => Promise.all([recordScout(), recordScout()])); // a duel is two scouts
 
-  const duel = computeDuel(withFlag(a.card), withFlag(b.card));
+  const locale = await resolveServerLocale();
+  const duel = computeDuel(withFlag(a.card), withFlag(b.card), locale);
   return (
     <div className="relative min-h-screen overflow-x-hidden text-ink">
       <Background />

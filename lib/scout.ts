@@ -62,7 +62,10 @@ async function writeCache(login: string, card: Card): Promise<void> {
 const inflight = new Map<string, Promise<Card>>();
 
 async function buildFresh(username: string, login: string): Promise<Card> {
-  const card = buildCard(signalsFromPayload(await fetchProfile(username)));
+  // OG images / JSON API always render in EN: product decision — the social
+  // card carries the brand read, not the viewer's locale. See lib/i18n/t.ts
+  // and the `t("@…")` locked-key escape hatch for the rest of the surface.
+  const card = buildCard(signalsFromPayload(await fetchProfile(username)), "en");
   await writeCache(login, card);
   return card;
 }
