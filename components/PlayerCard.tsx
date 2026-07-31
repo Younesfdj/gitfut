@@ -2,6 +2,7 @@
 
 import { memo, type CSSProperties } from "react";
 import type { Card, StatKey } from "@/lib/scoring/types";
+import { countryName } from "@/lib/countries";
 import { languageLogoUrl } from "@/lib/github/languages";
 import { cardDisplayName } from "@/lib/text";
 import { resolveCardTheme } from "./finishTheme";
@@ -227,7 +228,7 @@ function PlayerCard({ card }: { card: Card }) {
         <img
           src={`/badges/flags/${card.country}.png`}
           onError={hideOnError}
-          alt={card.country}
+          alt={countryName(card.country) ?? card.country}
           style={{
             ...at(17.59, 33.17),
             width: "14.81%",
