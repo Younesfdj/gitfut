@@ -112,6 +112,7 @@ interface UserNode {
     nodes: {
       nameWithOwner: string;
       stargazerCount: number;
+      isPrivate: boolean;
       primaryLanguage: { name: string } | null;
       createdAt: string;
       pushedAt: string;
@@ -250,9 +251,9 @@ function profileQuery(): string {
         location
         createdAt
         followers { totalCount }
-        repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
+        repositories(ownerAffiliations: OWNER, privacy: PUBLIC, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
           totalCount
-          nodes { nameWithOwner stargazerCount primaryLanguage { name } createdAt pushedAt }
+          nodes { nameWithOwner stargazerCount isPrivate primaryLanguage { name } createdAt pushedAt }
         }
         recent: contributionsCollection {
           totalCommitContributions
@@ -293,9 +294,9 @@ function basicsQuery(): string {
         location
         createdAt
         followers { totalCount }
-        repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
+        repositories(ownerAffiliations: OWNER, privacy: PUBLIC, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
           totalCount
-          nodes { nameWithOwner stargazerCount primaryLanguage { name } createdAt pushedAt }
+          nodes { nameWithOwner stargazerCount isPrivate primaryLanguage { name } createdAt pushedAt }
         }
       }
     }`;
@@ -505,20 +506,32 @@ async function fetchLifetime(
   return sums.reduce((a, b) => a + b, 0);
 }
 
+export interface FetchProfileOptions {
+  // Authenticated self-scout: use the viewer's OAuth token instead of the
+  // server pool so private/org contributions (where GitHub permits) are visible.
+  // Never pass a user token when scouting a different login.
+  accessToken?: string;
+}
+
 export async function fetchProfile(
   username: string,
   now = new Date(),
+  options?: FetchProfileOptions,
 ): Promise<RawPayload> {
   const login = username.trim().replace(/^@/, "");
   if (!VALID.test(login))
     return fail("invalid", "That doesn't look like a GitHub username.");
 
-  const pool = tokenPool();
-  if (!pool.length) return fail("config", "Server is missing a GitHub token.");
+  const viewerToken = options?.accessToken?.trim();
+  const pool = viewerToken ? [] : tokenPool();
+  if (!viewerToken && !pool.length) return fail("config", "Server is missing a GitHub token.");
 
-  // One token per scout (hash-sharded on the login), threaded through every
-  // query below so a user's profile + lifetime batches never straddle tokens.
-  let tok = pickToken(login, pool) as PoolToken;
+  // One token per scout. Viewer tokens skip the pool (no health / failover).
+  // Pool tokens are hash-sharded on the login and threaded through every query
+  // below so a user's profile + lifetime batches never straddle tokens.
+  let tok: PoolToken = viewerToken
+    ? { token: viewerToken, idx: -1 }
+    : (pickToken(login, pool) as PoolToken);
 
   // The one-shot profile query, degrading to the windowed rebuild when GitHub's
   // resource limits reject it for a hyperactive profile.
@@ -538,7 +551,8 @@ export async function fetchProfile(
   } catch (e) {
     // Only a rate limit is cured by another token (a timeout or 5xx would just
     // fail again) — retry once on the healthiest token, if the pool has one.
-    if ((e as GithubError).type !== "ratelimit" || pool.length < 2) throw e;
+    // Viewer tokens have no failover.
+    if (viewerToken || (e as GithubError).type !== "ratelimit" || pool.length < 2) throw e;
     const fallback = await pickFailover(tok.idx, pool);
     if (!fallback) throw e; // every other token is benched too
     tok = fallback;
@@ -559,7 +573,10 @@ export async function fetchProfile(
 }
 
 function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
-  const repos: RawRepo[] = user.repositories.nodes.map((n) => ({
+  // Belt-and-suspenders with `privacy: PUBLIC` on the query: drop any private
+  // owned nodes so a private-capable PAT can't inflate stars / languages.
+  const ownedPublic = user.repositories.nodes.filter((n) => !n.isPrivate);
+  const repos: RawRepo[] = ownedPublic.map((n) => ({
     stars: n.stargazerCount ?? 0,
     language: n.primaryLanguage?.name ?? null,
     createdAt: n.createdAt,
@@ -575,7 +592,7 @@ function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
   // language GitHub could classify. Private repos stay a bare contribution count in
   // GitHub's API (no repo/language), so they can't be counted here either.
   const languageByRepo = new Map<string, string | null>();
-  for (const n of user.repositories.nodes) {
+  for (const n of ownedPublic) {
     languageByRepo.set(n.nameWithOwner, n.primaryLanguage?.name ?? null);
   }
   for (const c of user.recent.commitContributionsByRepository ?? []) {

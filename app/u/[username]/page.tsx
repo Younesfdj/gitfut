@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic"; // per-user, token-gated, always fresh
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const { username } = await params;
-  const res = await loadCard(username);
+  const res = await loadCard(username, "viewer");
   if ("card" in res) {
     return {
       title: `${res.card.name} — ${res.card.overall} ${res.card.finishLabel} · GitFut`,
@@ -68,7 +68,7 @@ export default async function Page({
   const { country: override } = await searchParams;
   // Stars feed the footer "Support the project" link; fetched alongside the
   // scout (its own 1h cache keeps it cheap) so the report matches the home page.
-  const [res, stars] = await Promise.all([loadCard(username), getRepoStars()]);
+  const [res, stars] = await Promise.all([loadCard(username, "viewer"), getRepoStars()]);
   // Flag priority: a shared-link ?country= override wins, else the GitHub-derived
   // country. No IP/geo fallback — we never put the *viewer's* country on someone
   // else's card.

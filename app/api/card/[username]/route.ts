@@ -1,5 +1,6 @@
 import { type GithubError } from "@/lib/github/client";
-import { scoutCard } from "@/lib/scout";
+import { scoutCard, type ScoutOptions } from "@/lib/scout";
+import { getSession } from "@/lib/auth/session";
 import { pickFlag } from "@/lib/flagPriority";
 import { recordScout } from "@/lib/analytics";
 import { after } from "next/server";
@@ -14,10 +15,14 @@ function resolveCountry(card: Card, override: string | null): Card {
 export async function GET(req: Request, { params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   const override = new URL(req.url).searchParams.get("country");
-  // scoutCard handles the Redis cache and the tokenless sample fallback; here we
-  // just resolve the visitor's flag and record the scout after the response.
+  // Private-aware only when the signed-in viewer matches the scouted login.
+  // Embeds / anonymous callers get the public card.
+  const session = await getSession();
+  const options: ScoutOptions | undefined = session
+    ? { viewerLogin: session.login, viewerToken: session.accessToken }
+    : undefined;
   try {
-    const card = await scoutCard(username);
+    const card = await scoutCard(username, options);
     after(() => recordScout());
     return Response.json(resolveCountry(card, override));
   } catch (e) {

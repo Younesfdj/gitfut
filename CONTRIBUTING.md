@@ -17,13 +17,27 @@ Out of the box it runs on a handful of baked sample profiles (Torvalds, ThePrime
 
 ### Environment (optional)
 
-Create a `.env.local` only if you want live scouting or the counter:
+Copy [`.env.example`](./.env.example) to `.env.local` and fill in only what you need. Repo owners deploying to production: see **[DEPLOY.md](./DEPLOY.md)** (required tokens, OAuth Client ID/secret, `AUTH_SECRET`).
+
+```bash
+cp .env.example .env.local
+```
 
 ```bash
 # Live GitHub scouting (GraphQL). Use a fine-grained, READ-ONLY token with
-# public-repo access — no write scopes are ever needed. Without it, the app
+# *public* repository access only — no private/org scopes, no write scopes.
+# A personal PAT that can see your private repos will inflate local cards vs
+# production (stars/languages/contribution totals). Without a token, the app
 # serves the baked sample cards.
 GITHUB_TOKEN=github_pat_xxx
+
+# Optional: GitHub OAuth so users can sign in and scout *themselves* with
+# private/org contribution counts included (read:user). Create an OAuth App
+# at https://github.com/settings/developers — callback
+# http://localhost:3000/api/auth/callback/github
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+AUTH_SECRET=  # random 32+ byte string (openssl rand -hex 32)
 
 # Optional: scout counter + card cache. The app is fully functional without it,
 # and won't touch a remote Redis you can't reach — just leave it unset.

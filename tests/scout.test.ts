@@ -6,9 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const fetchProfile = vi.fn();
-vi.mock("@/lib/github/client", () => ({ fetchProfile: (u: string) => fetchProfile(u) }));
+vi.mock("@/lib/github/client", () => ({ fetchProfile: (...args: unknown[]) => fetchProfile(...args) }));
 vi.mock("@/lib/github/signals", () => ({ signalsFromPayload: (p: unknown) => p }));
 vi.mock("@/lib/scoring/engine", () => ({ buildCard: (s: unknown) => s }));
+vi.mock("@/lib/auth/session", () => ({ getSession: async () => null }));
 
 // In-memory Redis stand-in so read-through caching is exercised without a server.
 const store = new Map<string, string>();
@@ -99,5 +100,38 @@ describe("scoutCard single-flight", () => {
     fetchProfile.mockResolvedValueOnce(payload("torvalds"));
     await scoutCard("torvalds");
     expect(fetchProfile).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("scoutCard private-aware self-scout", () => {
+  it("uses the viewer token only when login matches", async () => {
+    fetchProfile.mockResolvedValue(payload("alice"));
+    const card = await scoutCard("alice", {
+      viewerLogin: "alice",
+      viewerToken: "user-tok",
+    });
+    expect(card).toMatchObject({ login: "alice", privateAware: true });
+    expect(fetchProfile).toHaveBeenCalledWith("alice", expect.any(Date), { accessToken: "user-tok" });
+    expect([...store.keys()].some((k) => k.includes(":auth:alice"))).toBe(true);
+  });
+
+  it("ignores a viewer token for a different login", async () => {
+    fetchProfile.mockResolvedValue(payload("bob"));
+    const card = await scoutCard("bob", {
+      viewerLogin: "alice",
+      viewerToken: "user-tok",
+    });
+    expect(card.privateAware).toBeUndefined();
+    expect(fetchProfile).toHaveBeenCalledWith("bob", expect.any(Date), undefined);
+    expect([...store.keys()].some((k) => k.includes(":auth:"))).toBe(false);
+  });
+
+  it("keeps public and auth caches separate", async () => {
+    fetchProfile.mockResolvedValue(payload("alice"));
+    await scoutCard("alice");
+    await scoutCard("alice", { viewerLogin: "alice", viewerToken: "user-tok" });
+    expect(fetchProfile).toHaveBeenCalledTimes(2);
+    expect(store.has("gitfut:card:v2:alice")).toBe(true);
+    expect(store.has("gitfut:card:v2:auth:alice")).toBe(true);
   });
 });

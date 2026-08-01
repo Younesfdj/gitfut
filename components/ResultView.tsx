@@ -14,6 +14,8 @@ import FooterCredit from "./FooterCredit";
 import BuyMeACoffee from "./BuyMeACoffee";
 import SupportProductHunt from "./SupportProductHunt";
 import GithubStar from "./GithubStar";
+import AuthButton from "./AuthButton";
+import { useAuth, signInHref } from "@/hooks/useAuth";
 import dynamic from "next/dynamic";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
 import DistributionPanel from "./DistributionPanel";
@@ -50,6 +52,10 @@ export default function ResultView({
   const theme = resolveResultTheme(card);
   const phase = useReveal(card.finish);
   const [modalOpen, setModalOpen] = useState(false);
+  const auth = useAuth();
+  const returnTo = `/${encodeURIComponent(card.login)}`;
+  const showPrivateCta =
+    auth.configured && !auth.loading && !auth.login && !card.privateAware;
 
   // BACK when the visitor came from home this tab; otherwise (direct / shared
   // link) a CTA to make their own card. Default to the CTA so share-link
@@ -119,6 +125,7 @@ export default function ResultView({
           <Mascot size={40} kick={false} ball={false} animate={false} />
         </div>
         <div className="flex items-center gap-[clamp(10px,2vw,16px)] justify-end">
+          <AuthButton returnTo={returnTo} />
           <button
             type="button"
             onClick={() => setModalOpen(true)}
@@ -129,6 +136,34 @@ export default function ResultView({
           <GithubStar stars={stars ?? null} />
         </div>
       </div>
+
+      {(card.privateAware || showPrivateCta) && (
+        <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] leading-snug text-ink-soft">
+          {card.privateAware ? (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-brand/30 bg-brand/10 px-2 py-1 font-mono text-[11px] font-semibold tracking-wide text-brand">
+              Includes private contributions
+            </span>
+          ) : null}
+          {card.privateAware ? (
+            <span>
+              Your public embed at{" "}
+              <code className="font-mono text-[11px] text-ink-dim">gitfut.com/{card.login}.png</code>{" "}
+              stays on the public card.
+            </span>
+          ) : showPrivateCta ? (
+            <span>
+              Work mostly in private/org repos?{" "}
+              <a
+                href={signInHref(returnTo)}
+                className="font-semibold text-brand underline-offset-2 hover:underline"
+              >
+                Sign in with GitHub
+              </a>{" "}
+              to include private contributions on your own scout.
+            </span>
+          ) : null}
+        </div>
+      )}
 
       <div className="shrink-0">
         <ReportHeader card={card} />

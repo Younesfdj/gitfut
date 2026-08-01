@@ -4,10 +4,15 @@ import { useState } from "react";
 import type { Card } from "@/lib/scoring/types";
 
 const TTL = 3 * 60 * 60 * 1000;
-const cacheKey = (login: string) => `gitfut:card:${login.toLowerCase()}`;
+const cacheKey = (login: string, privateAware = false) =>
+  privateAware
+    ? `gitfut:card:auth:${login.toLowerCase()}`
+    : `gitfut:card:${login.toLowerCase()}`;
 
 function readCache(login: string): Card | null {
   try {
+    // Prefer public cache for anonymous client scouts; private-aware keys are
+    // only written from an authenticated report page.
     const hit = JSON.parse(localStorage.getItem(cacheKey(login)) ?? "null");
     return hit && Date.now() - hit.t < TTL ? (hit.card as Card) : null;
   } catch {
@@ -19,7 +24,10 @@ function readCache(login: string): Card | null {
 // so the chosen country survives a re-scout within the TTL).
 export function writeCardCache(card: Card): void {
   try {
-    localStorage.setItem(cacheKey(card.login), JSON.stringify({ t: Date.now(), card }));
+    localStorage.setItem(
+      cacheKey(card.login, !!card.privateAware),
+      JSON.stringify({ t: Date.now(), card }),
+    );
   } catch {
     /* quota / private mode */
   }

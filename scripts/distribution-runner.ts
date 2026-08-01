@@ -98,9 +98,9 @@ const PROFILE_QUERY = `
     user(login: $login) {
       login name avatarUrl(size: 480) location createdAt
       followers { totalCount }
-      repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
+      repositories(ownerAffiliations: OWNER, privacy: PUBLIC, isFork: false, first: 100, orderBy: { field: STARGAZERS, direction: DESC }) {
         totalCount
-        nodes { nameWithOwner stargazerCount primaryLanguage { name } createdAt pushedAt }
+        nodes { nameWithOwner stargazerCount isPrivate primaryLanguage { name } createdAt pushedAt }
       }
       recent: contributionsCollection {
         totalCommitContributions totalPullRequestContributions
@@ -127,6 +127,7 @@ interface UserNode {
     nodes: {
       nameWithOwner: string;
       stargazerCount: number;
+      isPrivate: boolean;
       primaryLanguage: { name: string } | null;
       createdAt: string;
       pushedAt: string;
@@ -200,7 +201,8 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
   if (!user) return null;
   const createdYear = new Date(user.createdAt).getUTCFullYear();
   const lifetimeContributions = await fetchLifetime(login, createdYear);
-  const repos: RawRepo[] = user.repositories.nodes.map((n) => ({
+  const ownedPublic = user.repositories.nodes.filter((n) => !n.isPrivate);
+  const repos: RawRepo[] = ownedPublic.map((n) => ({
     stars: n.stargazerCount ?? 0,
     language: n.primaryLanguage?.name ?? null,
     createdAt: n.createdAt,
@@ -210,7 +212,7 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
   // lib/github/client.ts (incl. its 3-commit drive-by threshold) so the sampled
   // distribution sees the same language signal production scoring does.
   const languageByRepo = new Map<string, string | null>();
-  for (const n of user.repositories.nodes) {
+  for (const n of ownedPublic) {
     languageByRepo.set(n.nameWithOwner, n.primaryLanguage?.name ?? null);
   }
   for (const c of user.recent.commitContributionsByRepository ?? []) {
