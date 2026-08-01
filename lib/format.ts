@@ -16,6 +16,13 @@ export const formatCount = (n: number): string => {
   return String(Math.round(n));
 };
 
+// Thousands-grouped number for tooltips and copy (5000 → "5,000"). Locale-locked
+// to en-US so Node SSR and the client's browser locale always agree — otherwise
+// a 5,000-tip on a Spanish-locale browser renders as "5.000" and React throws a
+// hydration mismatch on the very first paint of any scout report that crosses
+// the thousands threshold in a <Tip> text node.
+export const formatThousands = (n: number): string => n.toLocaleString("en-US");
+
 // Fixed-precision rounding for deterministic geometry / imperative transforms —
 // shared so radar, VS burst and tilt all round identically.
 export const round2 = (n: number) => Math.round(n * 100) / 100;
