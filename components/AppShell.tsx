@@ -5,14 +5,21 @@ import { useRouter } from "next/navigation";
 import ScoutForm from "@/components/ScoutForm";
 import CardFan from "@/components/CardFan";
 import LoadingScreen from "@/components/LoadingScreen";
+import ResultView from "@/components/ResultView";
+import Background from "@/components/Background";
 import dynamic from "next/dynamic";
 import FooterCredit from "@/components/FooterCredit";
 import BuyMeACoffee from "@/components/BuyMeACoffee";
 import SupportProductHunt from "@/components/SupportProductHunt";
 import GithubStar from "@/components/GithubStar";
+import PrivateButton from "@/components/private/PrivateButton";
 import { SAMPLE_CARDS } from "@/lib/github/samples";
+import type { Card } from "@/lib/scoring/types";
 
 const HowItWorksModal = dynamic(() => import("@/components/HowItWorksModal"), {
+  ssr: false,
+});
+const PrivateDialog = dynamic(() => import("@/components/private/PrivateDialog"), {
   ssr: false,
 });
 // Home-only: AppShell is rendered solely by app/page.tsx, so the TEAM NEWS
@@ -30,6 +37,8 @@ export default function AppShell({
   const [isPending, startTransition] = useTransition();
   const [pending, setPending] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [privateOpen, setPrivateOpen] = useState(false);
+  const [privateCard, setPrivateCard] = useState<Card | null>(null);
 
   // Mark this tab as "has visited home" so a scouted card shows BACK, while a
   // directly-opened / shared card link (no home visit) shows a "make your card"
@@ -52,12 +61,30 @@ export default function AppShell({
 
   if (isPending && pending) return <LoadingScreen login={pending} />;
 
+  // Private mode: show the result in-place, no server navigation. The card is
+  // local-only — no sharable URL exists — so we render ResultView directly.
+  if (privateCard) {
+    return (
+      <div className="relative min-h-screen overflow-x-hidden text-ink">
+        <Background />
+        <ResultView
+          card={privateCard}
+          onBack={() => setPrivateCard(null)}
+          onCountryChange={() => {}}
+          stars={stars}
+          isPrivate
+        />
+      </div>
+    );
+  }
+
   return (
     <>
       <main className="relative z-[2] flex min-h-screen flex-col">
         {/* Overlaid in the corner (not a flow header) so it never pushes the
             vertically-centered hero down. */}
-        <div className="absolute right-[clamp(20px,5vw,52px)] top-[clamp(16px,3vh,26px)] z-[3]">
+        <div className="absolute right-[clamp(20px,5vw,52px)] top-[clamp(16px,3vh,26px)] z-[3] flex items-center gap-[10px]">
+          <PrivateButton onClick={() => setPrivateOpen(true)} />
           <GithubStar stars={stars} />
         </div>
         <div className="mx-auto flex w-full max-w-[1180px] flex-1 items-center gap-[clamp(24px,5vw,72px)] px-[clamp(22px,5vw,56px)] max-[860px]:flex-col max-[860px]:gap-[34px] max-[860px]:pb-6 max-[860px]:pt-[clamp(40px,6vh,56px)] max-[860px]:text-center">
@@ -79,6 +106,15 @@ export default function AppShell({
       <SupportProductHunt />
 
       {modalOpen && <HowItWorksModal onClose={() => setModalOpen(false)} />}
+      {privateOpen && (
+        <PrivateDialog
+          onClose={() => setPrivateOpen(false)}
+          onResult={(card) => {
+            setPrivateOpen(false);
+            setPrivateCard(card);
+          }}
+        />
+      )}
       <WhatsNew />
     </>
   );
