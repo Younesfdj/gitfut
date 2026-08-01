@@ -34,7 +34,7 @@ Your card lives at a URL. Drop it in your profile README, your portfolio, anywhe
 | **`gitfut.com/<username>`** | the full scout report |
 | **`?country=XX`** | override the flag (e.g. `?country=DZ`) |
 
-Embeds and unfurls always use **public** GitHub data. Sign in on the site to include private/org contributions on *your own* interactive scout report — that never changes the README image.
+Embeds and unfurls use **public** GitHub data by default (`gitfut.com/<user>.png`). After signing in on the site, you can enable a **private-aware** README image with an opaque GitFut `?k=` key (never put a GitHub token in your README). Open Graph previews stay public-only.
 
 <br/>
 

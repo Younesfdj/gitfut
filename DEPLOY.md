@@ -9,7 +9,7 @@ Copy the full variable list from [`.env.example`](./.env.example).
 | Variable | Required? | Purpose |
 |----------|-----------|---------|
 | `GITHUB_TOKEN` or `GITHUB_TOKENS` | **Yes in production** | Server PAT(s) for GraphQL. Without either, only baked sample cards (Torvalds, …) work — arbitrary usernames fail or never hit GitHub. |
-| `REDIS_URL` | Optional | Card cache + scout counter. App works without it; more GitHub calls under load. |
+| `REDIS_URL` | Optional for public scouting; **required for private README embeds** (`?k=`) | Card cache, scout counter, and opaque embed-key storage. |
 
 Use a **fine-grained, read-only** token with **public** repository access only. Never give the server token private/org scopes.
 
@@ -23,6 +23,22 @@ All three must be set together. If any is missing, the Sign in button stays hidd
 | `GITHUB_CLIENT_SECRET` | Same page → **Generate a new client secret** |
 | `AUTH_SECRET` | Not from GitHub. Generate yourself: `openssl rand -hex 32` |
 
+### Private-aware README embeds (`?k=`)
+
+After a user signs in, they can **Enable private README embed** on their card page. That mints an opaque GitFut key (not a GitHub PAT):
+
+```md
+[![My GitFut card](https://gitfut.com/USER.png?k=gf_…)](https://gitfut.com/USER)
+```
+
+| URL | Result |
+|-----|--------|
+| `/USER.png` | Public card |
+| `/USER.png?k=…` (valid for that user) | Private-aware card |
+| Wrong/revoked `k` | Falls back to public card |
+
+Needs **`AUTH_SECRET`** (always). **`REDIS_URL`** is preferred in production for short keys and instant revoke; without Redis the app issues a longer **sealed** `?k=` that still works (local/dev). Users can **Rotate** or **Disable** the key on the site. Leaking `k` exposes private-aware *card stats*, not GitHub credentials — rotate and update your README to revoke.
+
 ### OAuth App settings (production)
 
 Create (or update) the OAuth App owned by the account/org that runs gitfut.com:
@@ -35,6 +51,8 @@ Create (or update) the OAuth App owned by the account/org that runs gitfut.com:
 For local dev, use `http://localhost:3000` and `http://localhost:3000/api/auth/callback/github` (a second OAuth App, or extra callback URL if GitHub allows).
 
 Scope used by the app: `read:user` only (no write, no broad `repo`).
+
+## Will production work without `GITHUB_TOKEN`?
 
 **No — not for real users.**
 
@@ -52,7 +70,7 @@ OAuth alone is **not** a substitute for the server token: a signed-in user’s t
 1. Set `GITHUB_TOKEN` (or `GITHUB_TOKENS`) — public-repo, read-only.
 2. Set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `AUTH_SECRET` if you want Sign in / private-aware self-scouts.
 3. Point the OAuth App callback at `https://<your-domain>/api/auth/callback/github`.
-4. Optionally set `REDIS_URL`.
-5. Confirm: scout a non-sample username anonymously → live card; sign in as that user → “Includes private contributions” when applicable.
+4. Set `REDIS_URL` if you want private README embeds (`?k=`) and better card caching.
+5. Confirm: scout a non-sample username anonymously → live card; sign in as that user → “Includes private contributions”; enable private embed → `/user.png?k=…` differs from bare `/user.png` when private data exists.
 
 See also [CONTRIBUTING.md](./CONTRIBUTING.md) for local setup.

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useAuth, signInHref, signOut } from "@/hooks/useAuth";
 
 /** Compact GitHub sign-in / signed-in chip for the result top bar and home. */
@@ -9,19 +10,28 @@ export default function AuthButton({ returnTo }: { returnTo: string }) {
   if (!configured || loading) return null;
 
   if (login) {
+    const profileHref = `/${encodeURIComponent(login)}`;
     return (
       <div className="flex items-center gap-2">
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={avatarUrl}
-            alt=""
-            width={22}
-            height={22}
-            className="rounded-full border border-white/15"
-          />
-        ) : null}
-        <span className="font-mono hidden text-[12px] text-ink-soft sm:inline">@{login}</span>
+        <Link
+          href={profileHref}
+          className="group flex items-center gap-2 rounded-lg outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-brand/50"
+          title={`Open your GitFut card (@${login})`}
+        >
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt=""
+              width={22}
+              height={22}
+              className="rounded-full border border-white/15 transition group-hover:border-brand/40"
+            />
+          ) : null}
+          <span className="font-mono hidden text-[12px] text-ink-soft transition group-hover:text-brand sm:inline">
+            @{login}
+          </span>
+        </Link>
         <button
           type="button"
           onClick={() => signOut(returnTo)}

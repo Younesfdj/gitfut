@@ -15,6 +15,7 @@ import BuyMeACoffee from "./BuyMeACoffee";
 import SupportProductHunt from "./SupportProductHunt";
 import GithubStar from "./GithubStar";
 import AuthButton from "./AuthButton";
+import EmbedPanel from "./EmbedPanel";
 import { useAuth, signInHref } from "@/hooks/useAuth";
 import dynamic from "next/dynamic";
 import { AttributesPanel, MetricsPanel, ReportHeader } from "./ScoutReport";
@@ -56,6 +57,9 @@ export default function ResultView({
   const returnTo = `/${encodeURIComponent(card.login)}`;
   const showPrivateCta =
     auth.configured && !auth.loading && !auth.login && !card.privateAware;
+  const isOwner =
+    !!auth.login && auth.login.toLowerCase() === card.login.toLowerCase();
+  const showEmbedPanel = isOwner && (card.privateAware || !!auth.login);
 
   // BACK when the visitor came from home this tab; otherwise (direct / shared
   // link) a CTA to make their own card. Default to the CTA so share-link
@@ -146,9 +150,9 @@ export default function ResultView({
           ) : null}
           {card.privateAware ? (
             <span>
-              Your public embed at{" "}
-              <code className="font-mono text-[11px] text-ink-dim">gitfut.com/{card.login}.png</code>{" "}
-              stays on the public card.
+              Public embed stays at{" "}
+              <code className="font-mono text-[11px] text-ink-dim">gitfut.com/{card.login}.png</code>
+              . Copy your private <code className="font-mono text-[11px]">?k=</code> README link at the bottom of this page.
             </span>
           ) : showPrivateCta ? (
             <span>
@@ -232,6 +236,12 @@ export default function ResultView({
           </div>
         </div>
       </div>
+
+      {showEmbedPanel ? (
+        <div className="mx-auto mt-[clamp(28px,5vh,48px)] mb-2 w-full max-w-[920px]">
+          <EmbedPanel login={card.login} />
+        </div>
+      ) : null}
 
       <footer className="relative z-[2] mt-auto flex flex-none items-center justify-center p-[clamp(12px,2.6vh,24px)]">
         <FooterCredit />

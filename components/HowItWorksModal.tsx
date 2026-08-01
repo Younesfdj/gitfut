@@ -15,7 +15,7 @@ const READS = [
 
 // Optional note under the signal table — private work needs a signed-in self-scout.
 const PRIVATE_NOTE =
-  "Anonymous cards use public GitHub data (plus any private contribution count you chose to show on your profile). Sign in with GitHub to include private/org contributions on your own card. README embeds always stay public.";
+  "Anonymous cards use public GitHub data (plus any private contribution count you chose to show on your profile). Sign in with GitHub to include private/org contributions on your own card. README embeds are public by default; enable a private-aware image with a GitFut ?k= key after signing in — never a GitHub secret.";
 
 // How the scout reads you — the three things that make a card a fingerprint
 // rather than a score. These are independent truths, not steps, so no 01/02/03.

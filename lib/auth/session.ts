@@ -17,6 +17,8 @@ export interface Session {
   login: string;
   accessToken: string;
   avatarUrl?: string;
+  /** Last private-embed key (sealed mode without Redis, or cached for display). */
+  embedKey?: string;
 }
 
 export function oauthConfigured(): boolean {
@@ -62,6 +64,7 @@ export function decodeSession(raw: string): Session | null {
       login: String(parsed.login),
       accessToken: String(parsed.accessToken),
       avatarUrl: parsed.avatarUrl ? String(parsed.avatarUrl) : undefined,
+      embedKey: parsed.embedKey ? String(parsed.embedKey) : undefined,
     };
   } catch {
     return null;

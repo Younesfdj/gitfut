@@ -3,6 +3,7 @@ import { scoutCard } from "@/lib/scout";
 import { pickFlag } from "@/lib/flagPriority";
 import { renderCardImage } from "@/lib/og/renderCard";
 import { loadCardFonts } from "@/lib/og/card";
+import { resolveEmbedKey, touchEmbedKey } from "@/lib/auth/embedKey";
 
 export const runtime = "nodejs";
 
@@ -10,18 +11,39 @@ const W = 810;
 const H = 1230;
 
 // Embeddable card image: gitfut.com/<user>.png (via the next.config rewrite) -> here.
-// The card is rendered on demand to match the in-app PlayerCard (lib/og/renderCard)
-// and cached hard at the CDN, so there's no object store to keep in sync or pay for.
-// A failed scout (no such user) or a render error falls back to a small branded hint.
+// Bare URL = public card. `?k=<opaque>` = private-aware when the GitFut embed key
+// matches this username (never a GitHub PAT). Invalid/mismatched k falls back to
+// public so broken READMEs still render.
 export async function GET(req: Request, { params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
-  // Let embeds pin a flag: gitfut.com/<user>.png?country=fr (the .png rewrite keeps
-  // the query). A valid override wins, else the GitHub-derived flag — same priority
-  // as the page and JSON API.
-  const override = new URL(req.url).searchParams.get("country");
+  const url = new URL(req.url);
+  const override = url.searchParams.get("country");
+  const k = url.searchParams.get("k");
+
+  let privateAware = false;
+  let viewerLogin: string | undefined;
+  let viewerToken: string | undefined;
+
+  if (k) {
+    const embed = await resolveEmbedKey(k);
+    const loginNorm = username.trim().replace(/^@/, "").toLowerCase();
+    if (embed && embed.login.toLowerCase() === loginNorm) {
+      privateAware = true;
+      viewerLogin = embed.login;
+      viewerToken = embed.accessToken;
+    }
+  }
+
   try {
-    const card = await scoutCard(username);
-    return await renderCardImage({ ...card, country: pickFlag(override, card.country) ?? "" });
+    const card = await scoutCard(
+      username,
+      privateAware ? { viewerLogin, viewerToken } : undefined,
+    );
+    if (privateAware && k) await touchEmbedKey(k);
+    return await renderCardImage(
+      { ...card, country: pickFlag(override, card.country) ?? "" },
+      { privateAware },
+    );
   } catch {
     return fallback(username);
   }
