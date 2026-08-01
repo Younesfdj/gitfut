@@ -21,14 +21,26 @@ export function signalsFromPayload(p: RawPayload, now = Date.now()): Signals {
   // styling/markup (CSS/HTML) — the #1 drives the card's language + logo.
   const rankedLanguages = rankLanguages(p.languageRepos);
 
-  const years = new Set<number>();
+  // Distinct years the developer was active. The owned-repo dates below only see
+  // the top-100-by-stars repos (the client caps `repos` at `first: 100` ordered
+  // by stars), so a prolific dev's earlier or low-star years silently go missing.
+  // The per-year contribution breakdown (`p.years`) is fetched for EVERY calendar
+  // year, so count the years with any real contribution there too and take the
+  // larger of the two — this only ever fixes an undercount, never lowers the
+  // figure. `p.years` can be empty when its windows failed their retries, so the
+  // repo-date set stays as the fallback.
+  const repoYears = new Set<number>();
   for (const r of p.repos) {
     const c = yearOf(r.createdAt);
     const pushed = yearOf(r.pushedAt);
-    if (c) years.add(c);
-    if (pushed) years.add(pushed);
+    if (c) repoYears.add(c);
+    if (pushed) repoYears.add(pushed);
   }
-  const active_years = Math.min(Math.max(years.size, 1), Math.ceil(account_age_years) || 1);
+  const contributionYears = (p.years ?? []).filter(
+    (y) => y.commits + y.prs + y.reviews + y.issues + y.restricted > 0,
+  ).length;
+  const observedYears = Math.max(repoYears.size, contributionYears);
+  const active_years = Math.min(Math.max(observedYears, 1), Math.ceil(account_age_years) || 1);
 
   // Recent activity over the last year: every contribution type GitHub exposes,
   // including the private (restricted) count, so it matches the profile graph.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { signalsFromPayload } from "@/lib/github/signals";
 import type { RawPayload, RawRepo } from "@/lib/github/client";
+import type { YearBreakdown } from "@/lib/scoring/types";
 
 // The language signal is scored over `languageRepos` (owned ∪ recently-contributed
 // public repos, deduped in the client) — NOT the owned-only `repos`, which now
@@ -85,5 +86,59 @@ describe("signalsFromPayload — language diversity", () => {
     expect(s.languages).toBe(0);
     expect(s.rankedLanguages).toEqual([]);
     expect(s.topLanguage).toBeNull();
+  });
+});
+
+// `active_years` used to look only at owned-repo created/pushed dates, but `repos`
+// is capped at the top-100-by-stars repos — so a prolific dev's earlier/low-star
+// years went missing. It now also counts years from the per-year contribution
+// breakdown (`years`), which covers every calendar year, taking the larger count.
+describe("signalsFromPayload — active_years", () => {
+  const yr = (year: number, commits = 1): YearBreakdown => ({
+    year,
+    commits,
+    prs: 0,
+    reviews: 0,
+    issues: 0,
+    restricted: 0,
+  });
+
+  it("counts active years from the contribution breakdown, not just owned-repo dates", () => {
+    // The (top-100) repos only span 2021; contributions span 2020–2023.
+    const s = signalsFromPayload(
+      payload({
+        createdAt: "2018-01-01T00:00:00Z",
+        repos: [repo({ createdAt: "2021-01-01T00:00:00Z", pushedAt: "2021-06-01T00:00:00Z" })],
+        years: [yr(2020), yr(2021), yr(2022), yr(2023)],
+      }),
+      NOW,
+    );
+    expect(s.active_years).toBe(4); // 4 contribution years, not the 1 the repo dates show
+  });
+
+  it("falls back to repo dates when the contribution breakdown is empty", () => {
+    const s = signalsFromPayload(
+      payload({
+        createdAt: "2018-01-01T00:00:00Z",
+        repos: [
+          repo({ createdAt: "2019-01-01T00:00:00Z", pushedAt: "2020-01-01T00:00:00Z" }),
+          repo({ createdAt: "2021-01-01T00:00:00Z", pushedAt: "2021-01-01T00:00:00Z" }),
+        ],
+        years: [], // every year window failed its retry — omitted, not zeroed
+      }),
+      NOW,
+    );
+    expect(s.active_years).toBe(3); // 2019, 2020, 2021 from repo dates
+  });
+
+  it("ignores zero-contribution years and never exceeds account age", () => {
+    const s = signalsFromPayload(
+      payload({
+        createdAt: "2025-01-01T00:00:00Z", // ~1.5 yr old at NOW (2026-07)
+        years: [yr(2025), yr(2026), yr(2024, 0)], // 2024 has no contributions
+      }),
+      NOW,
+    );
+    expect(s.active_years).toBe(2); // two active years, capped at ceil(age) = 2
   });
 });
