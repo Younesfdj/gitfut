@@ -1,5 +1,17 @@
 import { buildCard } from "@/lib/scoring/engine";
-import type { Card, Signals } from "@/lib/scoring/types";
+import { computeAwards, type WcWindowTotals } from "@/lib/awards";
+import type { Card, Signals, YearBreakdown } from "@/lib/scoring/types";
+
+// Compact literals for the baked per-year history (real data, captured
+// 2026-07-21 alongside the other signals).
+const yr = (
+  year: number,
+  commits: number,
+  prs: number,
+  reviews: number,
+  issues: number,
+  restricted: number,
+): YearBreakdown => ({ year, commits, prs, reviews, issues, restricted });
 
 // Home-fan showcase: four REAL GitHub accounts, so every card resolves to a live
 // scout when clicked (no 404s). Signals were captured once and baked here to keep
@@ -31,6 +43,14 @@ const RAW: Signals[] = [
     issues_closed: 2,
     recent_commits: 3255,
     recent_spike: false,
+    years: [
+      yr(2011, 2085, 0, 0, 0, 0), yr(2012, 2289, 0, 0, 0, 0), yr(2013, 2046, 0, 0, 0, 0),
+      yr(2014, 2086, 0, 0, 0, 0), yr(2015, 2009, 0, 0, 1, 0), yr(2016, 2275, 0, 0, 0, 0),
+      yr(2017, 2314, 15, 0, 0, 0), yr(2018, 2176, 17, 3, 1, 0), yr(2019, 2382, 18, 1, 0, 0),
+      yr(2020, 2635, 20, 6, 0, 0), yr(2021, 2415, 4, 6, 0, 0), yr(2022, 2601, 6, 7, 3, 0),
+      yr(2023, 2506, 2, 1, 1, 0), yr(2024, 2888, 3, 1, 0, 0), yr(2025, 2922, 0, 0, 1, 0),
+      yr(2026, 1789, 0, 2, 2, 0),
+    ],
   },
   {
     login: "ThePrimeagen",
@@ -55,6 +75,13 @@ const RAW: Signals[] = [
     issues_closed: 15,
     recent_commits: 2809,
     recent_spike: true,
+    years: [
+      yr(2013, 73, 1, 0, 0, 0), yr(2014, 53, 4, 0, 2, 43), yr(2015, 1724, 224, 0, 77, 88),
+      yr(2016, 269, 33, 0, 10, 164), yr(2017, 9, 1, 0, 1, 666), yr(2018, 5, 2, 1, 2, 148),
+      yr(2019, 42, 1, 0, 1, 128), yr(2020, 526, 37, 12, 24, 78), yr(2021, 633, 75, 46, 44, 64),
+      yr(2022, 720, 8, 9, 7, 78), yr(2023, 510, 9, 28, 22, 64), yr(2024, 358, 166, 4, 0, 68),
+      yr(2025, 441, 0, 0, 1, 42), yr(2026, 202, 5, 9, 15, 3697),
+    ],
   },
   {
     login: "pewdiepie-archdaemon",
@@ -79,6 +106,7 @@ const RAW: Signals[] = [
     issues_closed: 3,
     recent_commits: 566,
     recent_spike: false,
+    years: [yr(2025, 127, 0, 0, 0, 0), yr(2026, 575, 9, 233, 3, 0)],
   },
   {
     login: "t3dotgg",
@@ -103,8 +131,55 @@ const RAW: Signals[] = [
     issues_closed: 4,
     recent_commits: 1488,
     recent_spike: false,
+    years: [
+      yr(2014, 20, 0, 0, 0, 0), yr(2015, 135, 1, 0, 23, 136), yr(2016, 189, 20, 6, 34, 110),
+      yr(2017, 17, 3, 4, 4, 29), yr(2018, 1, 1, 0, 0, 11), yr(2019, 16, 2, 0, 0, 103),
+      yr(2020, 72, 3, 1, 0, 91), yr(2021, 648, 43, 4, 20, 2987), yr(2022, 655, 58, 34, 25, 1564),
+      yr(2023, 621, 174, 130, 33, 555), yr(2024, 360, 67, 27, 7, 430), yr(2025, 379, 40, 7, 6, 1795),
+      yr(2026, 301, 83, 7, 3, 1489),
+    ],
   },
 ];
 
-export const SAMPLE_CARDS: Card[] = RAW.map(buildCard);
+// Real WC-tournament-window totals for the samples (same capture), so the demo
+// cabinets carry genuine Golden Balls without a scout-time query.
+const wcWin = (
+  edition: string,
+  year: number,
+  commits: number,
+  prs: number,
+  reviews: number,
+  issues: number,
+  restricted: number,
+): WcWindowTotals => ({ edition, year, commits, prs, reviews, issues, restricted });
+
+const SAMPLE_WC: Record<string, WcWindowTotals[]> = {
+  torvalds: [
+    wcWin("South Africa 2010", 2010, 69, 0, 0, 0, 0),
+    wcWin("Brazil 2014", 2014, 143, 0, 0, 0, 0),
+    wcWin("Russia 2018", 2018, 164, 4, 0, 1, 0),
+    wcWin("Qatar 2022", 2022, 256, 0, 0, 0, 0),
+    wcWin("North America 2026", 2026, 378, 0, 0, 0, 0),
+  ],
+  ThePrimeagen: [
+    wcWin("Brazil 2014", 2014, 3, 0, 0, 0, 0),
+    wcWin("Qatar 2022", 2022, 37, 0, 0, 1, 35),
+    wcWin("North America 2026", 2026, 16, 0, 0, 0, 2492),
+  ],
+  "pewdiepie-archdaemon": [wcWin("North America 2026", 2026, 389, 5, 107, 0, 0)],
+  t3dotgg: [
+    wcWin("Qatar 2022", 2022, 53, 4, 2, 0, 11),
+    wcWin("North America 2026", 2026, 11, 31, 0, 0, 976),
+  ],
+};
+
+// The capture date pins the partial-2026 pace math, keeping sample cabinets
+// deterministic across deploys.
+const CAPTURED = new Date("2026-07-21T00:00:00Z");
+
+export const SAMPLE_CARDS: Card[] = RAW.map((s) => {
+  const card = buildCard(s);
+  card.awards = computeAwards(card, SAMPLE_WC[s.login] ?? [], CAPTURED);
+  return card;
+});
 export const SAMPLE_LOGINS = RAW.map((r) => r.login);

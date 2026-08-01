@@ -30,6 +30,32 @@ export interface Signals {
   issues_closed: number;
   recent_commits: number;
   recent_spike: boolean;
+  // Per-year history, oldest first. Optional: hand-authored sample Signals and
+  // previously serialized data predate it.
+  years?: YearBreakdown[];
+}
+
+// One calendar year of real contribution activity (from GitHub's per-year
+// contributionsCollection windows). The substrate for yearly awards: fetched
+// years may be missing (a window that failed its retry is omitted, not zeroed).
+export interface YearBreakdown {
+  year: number;
+  commits: number;
+  prs: number;
+  reviews: number;
+  issues: number;
+  restricted: number; // private contributions (count only)
+}
+
+export type AwardKey = "ballon_dor" | "wc_golden_ball" | "golden_boot" | "world_cup";
+
+// One earned trophy (see lib/awards for the rules). BdO instances carry the
+// year; Golden Balls the edition; the reason is shown in the details modal.
+export interface AwardInstance {
+  key: AwardKey;
+  year?: number;
+  edition?: string;
+  reason: string;
 }
 
 export type WorkRateLevel = "High" | "Med" | "Low";
@@ -105,5 +131,11 @@ export interface Card {
   // True when this card was built with the viewer's OAuth token (self-scout) so
   // private/org contributions could be included. Public embeds never set this.
   privateAware?: boolean;
+  // Per-year history behind the yearly awards (Ballon d'Or etc.). Optional so
+  // cached/serialized cards from before the awards system stay valid.
+  years?: YearBreakdown[];
+  // The trophy cabinet, computed at scout time (lib/awards via lib/scout).
+  // Optional for the same serialization reason.
+  awards?: AwardInstance[];
   report: Report;
 }

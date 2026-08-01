@@ -21,6 +21,6 @@ export const WHATS_NEW: WhatsNewItem[] = [
     id: "duels",
     title: "DUEL A RIVAL",
     body: "Take your card head-to-head against any dev. Six stats, one winner. The gold VS plate is on your card page.",
-    show: true,
+    show: false,
   },
 ];

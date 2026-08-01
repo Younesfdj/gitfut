@@ -5,16 +5,18 @@ import { resolveResultTheme } from "./finishTheme";
 import { Tip } from "./ScoutReport";
 import type { Card } from "@/lib/scoring/types";
 
-// Small "where you stand" histogram under the scouting metrics: overall rating
-// of a uniform random sample of GitHub accounts (scored by this same engine),
-// with this card's overall marked. Sqrt-scaled bar heights so the long bronze
-// tail doesn't flatten everything right of 60 (the interesting part).
+// The "where you stand" histogram: overall rating of a uniform random sample
+// of GitHub accounts (scored by this same engine), with this card's overall
+// marked. Sqrt-scaled bar heights so the long bronze tail doesn't flatten
+// everything right of 60 (the interesting part). Renders as its own report
+// panel by default (trophy-less cards); `bare` drops the chrome for the
+// "where you rank" modal, which owns the border, title and padding.
 const W = 328;
 const H = 64;
 const PAD_TOP = 14;
 const X_MAX = 100;
 
-export default function DistributionPanel({ card }: { card: Card }) {
+export default function DistributionPanel({ card, bare = false }: { card: Card; bare?: boolean }) {
   const accent = resolveResultTheme(card).ink;
   const maxCount = Math.max(...DIST_COUNTS);
   const span = X_MAX - DIST_MIN;
@@ -40,11 +42,13 @@ export default function DistributionPanel({ card }: { card: Card }) {
     `and ${(DIST_ACTIVE_N - act.atOrAbove).toLocaleString()} of the ${DIST_ACTIVE_N.toLocaleString()} who were active in the past year.`;
 
   return (
-    <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-[16px]">
-      <div className="mb-[8px] flex items-center gap-[9px]">
-        <span className="h-[2px] w-[16px] rounded-full" style={{ background: accent }} />
-        <h3 className="font-display text-[11px] font-bold tracking-[.22em] text-ink-faint">DISTRIBUTION</h3>
-      </div>
+    <section className={bare ? undefined : "rounded-2xl border border-white/[0.06] bg-white/[0.02] p-[16px]"}>
+      {!bare && (
+        <div className="mb-[8px] flex items-center gap-[9px]">
+          <span className="h-[2px] w-[16px] rounded-full" style={{ background: accent }} />
+          <h3 className="font-display text-[11px] font-bold tracking-[.22em] text-ink-faint">DISTRIBUTION</h3>
+        </div>
+      )}
       <svg viewBox={`0 0 ${W} ${H + 16}`} className="w-full" role="img" aria-label={`Overall rating ${card.overall} versus a random sample of ${DIST_N} GitHub accounts`}>
         {DIST_COUNTS.map((c, i) =>
           c === 0 ? null : (

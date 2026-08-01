@@ -386,3 +386,15 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Ball-cursor toy (components/BallCursor): the real cursor hides only while
+   the user is actively dribbling — never by default. */
+html.gf-ball-cursor,
+html.gf-ball-cursor * {
+  cursor: none !important;
+}
+html.gf-ball-cursor input,
+html.gf-ball-cursor textarea,
+html.gf-ball-cursor [contenteditable="true"] {
+  cursor: text !important;
+}

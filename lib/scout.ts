@@ -2,10 +2,11 @@ import "server-only";
 import { cache } from "react";
 import { redis } from "./redis";
 import { buildCard } from "./scoring/engine";
-import { fetchProfile, type GithubError } from "./github/client";
+import { fetchProfile, fetchWindows, type GithubError } from "./github/client";
 import { signalsFromPayload } from "./github/signals";
 import { SAMPLE_CARDS } from "./github/samples";
 import { getSession } from "./auth/session";
+import { computeAwards, wcBallCandidate, WC_EDITIONS, type WcWindowTotals } from "./awards";
 import type { Card } from "./scoring/types";
 
 // Read-through Redis cache for built cards — the single path every scout surface
@@ -21,10 +22,10 @@ import type { Card } from "./scoring/types";
 // builds are stored; scout errors (notfound / ratelimit / …) propagate unchanged
 // and are never cached.
 
-// Namespaced alongside gitfut:scouts:total. The version segment lets a deploy
+// Namespaced alongside gitfut:scouts:totahttps://github.com/Younesfdj/gitfut/pull/109/conflict?name=lib%252Fscout.ts&ancestor_oid=9b631f6ceb530fa5d318518ffd9ecebb63a9e9c4&base_oid=07aa9d4af46ff37070e5af8348f70b89297d2de0&head_oid=e959fee27ae672b73c7718161634416ff11c2ac9l. The version segment lets a deploy
 // that changes buildCard's output shape or scoring invalidate every entry at
 // once (bump it) instead of serving stale-shaped cards until their TTL lapses.
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v2"; // v2: cards carry years + the awards cabinet
 const CARD_TTL_SECONDS = 120 * 60; // 2h — GitHub stats move slowly; longer TTL = fewer refetches of hot profiles under load.
 const AUTH_CARD_TTL_SECONDS = 60 * 60; // 1h — private-aware cards can move with private work
 
@@ -93,12 +94,32 @@ async function buildFresh(
     ...buildCard(signalsFromPayload(payload)),
     ...(privateAware ? { privateAware: true } : null),
   };
+  card.awards = computeAwards(card, await wcWindowsFor(card, username));
   await writeCache(
     cacheKey,
     card,
     privateAware ? AUTH_CARD_TTL_SECONDS : CARD_TTL_SECONDS,
   );
   return card;
+}
+
+// Tournament-window data for the WC Golden Ball: one extra GraphQL query, paid
+// only by candidates (strong profile + activity in a WC year) and best-effort —
+// a failure just means the Golden Ball isn't judged this scout.
+async function wcWindowsFor(card: Card, username: string): Promise<WcWindowTotals[]> {
+  if (!wcBallCandidate(card)) return [];
+  try {
+    const totals = await fetchWindows(
+      username,
+      WC_EDITIONS.map((ed) => ({ id: ed.edition, from: ed.from, to: ed.to })),
+    );
+    return WC_EDITIONS.flatMap((ed) => {
+      const t = totals[ed.edition];
+      return t ? [{ ...t, year: ed.year, edition: ed.edition }] : [];
+    });
+  } catch {
+    return [];
+  }
 }
 
 // Username -> Card, Redis-cached. Throws the same GithubError as fetchProfile
