@@ -13,6 +13,10 @@ const READS = [
   { abbr: "PHY", gloss: "A lifetime of contributions over your active years" },
 ];
 
+// Optional note under the signal table — private work needs a signed-in self-scout.
+const PRIVATE_NOTE =
+  "Anonymous cards use public GitHub data (plus any private contribution count you chose to show on your profile). Sign in with GitHub to include private/org contributions on your own card. README embeds are public by default; enable a private-aware image with a GitFut ?k= key after signing in — never a GitHub secret.";
+
 // How the scout reads you — the three things that make a card a fingerprint
 // rather than a score. These are independent truths, not steps, so no 01/02/03.
 const LAWS = [
@@ -149,6 +153,7 @@ export default function HowItWorksModal({ onClose }: { onClose: () => void }) {
               </div>
             ))}
           </div>
+          <p className="m-0 mt-[14px] text-[12.5px] leading-[1.5] text-ink-faint">{PRIVATE_NOTE}</p>
         </div>
 
         {/* the ladder — what you're chasing, low to legend */}

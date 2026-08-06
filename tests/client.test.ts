@@ -424,9 +424,14 @@ describe("fetchProfile language diversity (owned ∪ contributed)", () => {
   // A profile whose OWNED public repos are thin (one TS repo + one empty repo),
   // but who commits to several repos they don't own — the org/team-dev shape that
   // used to score "0 languages".
-  const ownedNode = (nameWithOwner: string, language: string | null) => ({
+  const ownedNode = (
+    nameWithOwner: string,
+    language: string | null,
+    opts: { isPrivate?: boolean; stars?: number } = {},
+  ) => ({
     nameWithOwner,
-    stargazerCount: 0,
+    stargazerCount: opts.stars ?? 0,
+    isPrivate: opts.isPrivate ?? false,
     primaryLanguage: language ? { name: language } : null,
     createdAt: "2022-01-01T00:00:00Z",
     pushedAt: "2024-01-01T00:00:00Z",
@@ -473,6 +478,39 @@ describe("fetchProfile language diversity (owned ∪ contributed)", () => {
     scriptFetch((_t, body) => (body.includes("query Profile") ? ok({ data: { user: USER_LANGS } }) : ok({ data: { user: {} } })));
     await fetchProfile(LOGIN, NOW);
     expect(calls[0].body).toContain("commitContributionsByRepository");
+  });
+
+  it("requests owned repositories with privacy: PUBLIC", async () => {
+    scriptFetch((_t, body) => (body.includes("query Profile") ? ok({ data: { user: USER_LANGS } }) : ok({ data: { user: {} } })));
+    await fetchProfile(LOGIN, NOW);
+    expect(calls[0].body).toMatch(/repositories\([^)]*privacy:\s*PUBLIC/);
+  });
+
+  it("drops private owned repos from stars and languages even if returned", async () => {
+    const withPrivateOwned = {
+      ...USER_LANGS,
+      repositories: {
+        totalCount: 3,
+        nodes: [
+          ownedNode("someuser/own-ts", "TypeScript"),
+          ownedNode("someuser/secret", "Zig", { isPrivate: true, stars: 999 }),
+          ownedNode("someuser/own-empty", null),
+        ],
+      },
+    };
+    scriptFetch((_t, body) =>
+      body.includes("query Profile") ? ok({ data: { user: withPrivateOwned } }) : ok({ data: { user: {} } }),
+    );
+    const payload = await fetchProfile(LOGIN, NOW);
+    expect(payload.repos.every((r) => r.stars !== 999)).toBe(true);
+    expect(langsOf(payload).has("Zig")).toBe(false);
+    expect(langsOf(payload)).toEqual(new Set(["TypeScript", "Go", "Rust"]));
+  });
+
+  it("uses an override accessToken instead of the pool", async () => {
+    scriptFetch((_t, body) => (body.includes("query Profile") ? ok({ data: { user: USER } }) : ok({ data: { user: {} } })));
+    await fetchProfile(LOGIN, NOW, { accessToken: "viewer-tok" });
+    expect(calls[0].token).toBe("viewer-tok");
   });
 
   it("folds contributed public repos into the language set, deduped against owned repos", async () => {

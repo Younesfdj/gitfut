@@ -34,6 +34,8 @@ Your card lives at a URL. Drop it in your profile README, your portfolio, anywhe
 | **`gitfut.com/<username>`** | the full scout report |
 | **`?country=XX`** | override the flag (e.g. `?country=DZ`) |
 
+Embeds and unfurls use **public** GitHub data by default (`gitfut.com/<user>.png`). After signing in on the site, you can enable a **private-aware** README image with an opaque GitFut `?k=` key (never put a GitHub token in your README). Open Graph previews stay public-only.
+
 <br/>
 
 ## ⚙️ &nbsp;How the scouting works
@@ -132,6 +134,8 @@ The whole cabinet is computed server-side at scout time and cached with the card
 **Built with** Next.js · TypeScript · Tailwind · Redis
 
 **[gitfut.com](https://gitfut.com)** &nbsp;·&nbsp; scout someone today
+
+Deploy / env for owners: **[DEPLOY.md](./DEPLOY.md)**
 
 <img src="https://capsule-render.vercel.app/api?type=waving&height=90&color=0:39d353,100:006d32&section=footer" alt="" width="100%">
 

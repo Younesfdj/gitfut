@@ -28,6 +28,8 @@ You'll get an acknowledgement within **72 hours**, and I'll work to ship a fix a
 - vulnerabilities in third-party dependencies with no working exploit against GitFut (please report those upstream),
 - automated scanner output with no demonstrated impact.
 
+**Note on private README embed keys (`?k=`):** these are GitFut-issued capability tokens, not GitHub credentials. A leaked `k` can expose a user's private-aware *card stats* (contribution-influenced ratings) via the public PNG URL until they rotate or revoke the key on the site. Report flaws in key handling / auth under in-scope API routes.
+
 ## Supported versions
 
 GitFut is a continuously-deployed web app — only the currently deployed version (tracking `master`) is supported. There are no tagged releases to backport fixes to.

@@ -209,12 +209,20 @@ export function cardTree(card: Card, assets: CardAssets, w: number) {
 }
 
 // The standalone embeddable card image: gitfut.com/<user>.png.
-export async function renderCardImage(card: Card): Promise<ImageResponse> {
+export async function renderCardImage(
+  card: Card,
+  opts?: { privateAware?: boolean },
+): Promise<ImageResponse> {
   const assets = await loadCardAssets(card, EMBED_W);
+  // Private-aware embeds use a short TTL so rotated keys / fresh private stats
+  // don't stick on a CDN for a week. Public embeds stay aggressively cached.
+  const cache = opts?.privateAware
+    ? "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+    : "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
   return new ImageResponse(cardTree(card, assets, EMBED_W), {
     width: EMBED_W,
     height: cardH(EMBED_W),
     fonts: assets.fonts,
-    headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800" },
+    headers: { "Cache-Control": cache },
   });
 }

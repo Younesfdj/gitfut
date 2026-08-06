@@ -128,6 +128,9 @@ export interface Card {
   // Set only for gitfut founders — their bespoke card art/accent + hint metadata.
   // Optional so every other card (and previously serialized ones) stay valid.
   founder?: FounderMeta;
+  // True when this card was built with the viewer's OAuth token (self-scout) so
+  // private/org contributions could be included. Public embeds never set this.
+  privateAware?: boolean;
   // Per-year history behind the yearly awards (Ballon d'Or etc.). Optional so
   // cached/serialized cards from before the awards system stay valid.
   years?: YearBreakdown[];
