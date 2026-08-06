@@ -21,7 +21,7 @@ const COUNTRY: Record<string, string> = {
   denmark: "dk", danmark: "dk", ireland: "ie", austria: "at", österreich: "at", osterreich: "at",
   belgium: "be", belgique: "be", portugal: "pt", argentina: "ar", mexico: "mx", méxico: "mx",
   "czech republic": "cz", czechia: "cz", romania: "ro", greece: "gr", turkey: "tr", türkiye: "tr", turkiye: "tr",
-  indonesia: "id", "new zealand": "nz", "south africa": "za", nigeria: "ng", egypt: "eg",
+  israel: "il", indonesia: "id", "new zealand": "nz", "south africa": "za", nigeria: "ng", egypt: "eg",
   pakistan: "pk", bangladesh: "bd", vietnam: "vn", "viet nam": "vn", thailand: "th", philippines: "ph",
   malaysia: "my", "hong kong": "hk", taiwan: "tw", colombia: "co", chile: "cl", peru: "pe", venezuela: "ve",
   hungary: "hu", bulgaria: "bg", serbia: "rs", croatia: "hr", slovakia: "sk", slovenia: "si",
