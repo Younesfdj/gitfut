@@ -43,6 +43,7 @@ const RAW: Signals[] = [
     issues_closed: 2,
     recent_commits: 3255,
     recent_spike: false,
+    hidden_activity: false,
     years: [
       yr(2011, 2085, 0, 0, 0, 0), yr(2012, 2289, 0, 0, 0, 0), yr(2013, 2046, 0, 0, 0, 0),
       yr(2014, 2086, 0, 0, 0, 0), yr(2015, 2009, 0, 0, 1, 0), yr(2016, 2275, 0, 0, 0, 0),
@@ -75,6 +76,7 @@ const RAW: Signals[] = [
     issues_closed: 15,
     recent_commits: 2809,
     recent_spike: true,
+    hidden_activity: false,
     years: [
       yr(2013, 73, 1, 0, 0, 0), yr(2014, 53, 4, 0, 2, 43), yr(2015, 1724, 224, 0, 77, 88),
       yr(2016, 269, 33, 0, 10, 164), yr(2017, 9, 1, 0, 1, 666), yr(2018, 5, 2, 1, 2, 148),
@@ -106,6 +108,7 @@ const RAW: Signals[] = [
     issues_closed: 3,
     recent_commits: 566,
     recent_spike: false,
+    hidden_activity: false,
     years: [yr(2025, 127, 0, 0, 0, 0), yr(2026, 575, 9, 233, 3, 0)],
   },
   {
@@ -131,6 +134,7 @@ const RAW: Signals[] = [
     issues_closed: 4,
     recent_commits: 1488,
     recent_spike: false,
+    hidden_activity: false,
     years: [
       yr(2014, 20, 0, 0, 0, 0), yr(2015, 135, 1, 0, 23, 136), yr(2016, 189, 20, 6, 34, 110),
       yr(2017, 17, 3, 4, 4, 29), yr(2018, 1, 1, 0, 0, 11), yr(2019, 16, 2, 0, 0, 103),

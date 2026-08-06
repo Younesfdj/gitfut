@@ -36,6 +36,7 @@ const base: Signals = {
   issues_closed: 4,
   recent_commits: 280,
   recent_spike: false,
+  hidden_activity: false,
 };
 
 const signals = (over: Partial<Signals> = {}): Signals => ({ ...base, ...over });
