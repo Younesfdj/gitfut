@@ -54,7 +54,7 @@ export function deriveStyle(s: Signals): { value: string; reason: string } {
     return { value: "Controlled", reason: "A long, steady track record." };
   if (s.max_repo_stars >= 5000 && s.recent_contributions < 200)
     return { value: "Clinical", reason: "One big hit, quiet lately." };
-  if (s.recent_contributions >= 300) return { value: "Industrious", reason: "Steadily active this year." };
+  if (s.recent_contributions >= 300) return { value: "Industrious", reason: "Steadily active over the past year." };
   return { value: "Measured", reason: "Light recent activity." };
 }
 
