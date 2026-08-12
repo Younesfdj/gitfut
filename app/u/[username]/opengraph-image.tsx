@@ -77,7 +77,7 @@ export default async function Image({ params }: { params: Promise<{ username: st
   }
 
   const card = { ...raw, country: pickFlag(null, raw.country) ?? "" }; // GitHub-derived flag only
-  const accent = card.founder?.accent ?? TIER_ACCENT[card.finish] ?? "#39d353";
+  const accent = card.founder?.accent ?? card.patron?.accent ?? TIER_ACCENT[card.finish] ?? "#39d353";
   const groups = groupAwards(card.awards);
   const [assets, stills] = await Promise.all([loadCardAssets(card, CARD_W), loadTrophyStills(groups)]);
   const shelf = groups.length ? trophyShelf({ groups, stills, tall: 92 }) : null;
