@@ -1,7 +1,7 @@
 import { countryForLogin } from "../geo";
 import { topLanguageLogo } from "../github/languages";
 import { deriveMetrics, deriveSkillMoves, deriveStyle, deriveWeakFoot, deriveWorkRate } from "./attributes";
-import { ATTACK_STATS, FINISH_LABELS, FOUNDER_OVERALL, FOUNDERS, K, STATS, WEIGHTS } from "./constants";
+import { ATTACK_STATS, FINISH_LABELS, FOUNDER_OVERALL, FOUNDERS, K, PATRONS, PATRON_OVERALL, STATS, WEIGHTS } from "./constants";
 import { derivePlaystyles } from "./playstyles";
 import type {
   Archetype,
@@ -179,13 +179,19 @@ export function buildCard(s: Signals): Card {
   // `finish` directly rather than via pickFinish: any overall >= 90 would
   // otherwise auto-promote to ICON (and flip club/archetype), hijacking the look.
   const founder = FOUNDERS[s.login.toLowerCase()];
-  const overall = founder
+  const patron = PATRONS[s.login.toLowerCase()];
+  const forcedOVR = founder
     ? FOUNDER_OVERALL[s.login.toLowerCase()]
-    : clamp(baseOVR + Math.round(K.legacy.bonusMax * L), 1, 99);
-  const finish: Finish = founder ? "founder" : pickFinish(overall, L, s.recent_spike, s.login);
+    : patron
+      ? PATRON_OVERALL[s.login.toLowerCase()]
+      : undefined;
+  const overall = forcedOVR ?? clamp(baseOVR + Math.round(K.legacy.bonusMax * L), 1, 99);
+  const finish: Finish = founder ? "founder" : patron ? "patron" : pickFinish(overall, L, s.recent_spike, s.login);
   const archetype = founder
     ? { name: "Founder", blurb: "co-founder of GitFut — they built the very scout reading this card" }
-    : archetypeFromShape(stats, finish);
+    : patron
+      ? { name: "Patron", blurb: "He proved himself on the pitch — now he runs things from the sideline, a true mastermind." }
+      : archetypeFromShape(stats, finish);
   const skill = deriveSkillMoves(s);
   const weak = deriveWeakFoot(stats);
   const work = deriveWorkRate(stats);
@@ -211,6 +217,7 @@ export function buildCard(s: Signals): Card {
     topLanguage: s.topLanguage ?? null,
     languageLogo,
     ...(founder ? { founder } : null),
+    ...(patron ? { patron } : null),
     ...(s.years ? { years: s.years } : null),
     legacy: { L },
     report: {

@@ -21,6 +21,7 @@ const BURST_TIERS: ReadonlySet<Finish> = new Set<Finish>([
   "icon",
   "totw",
   "founder",
+  "patron",
 ]);
 
 export function hasBurst(finish: Finish): boolean {

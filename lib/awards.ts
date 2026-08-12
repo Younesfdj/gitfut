@@ -124,7 +124,7 @@ function ballonDors(card: Card): AwardInstance[] {
         (s.score >= BDO_RATIO * mid || s.score >= BDO_ELITE),
     )
     .sort((a, b) => b.score - a.score);
-  const icon = card.finish === "icon" || card.finish === "founder";
+  const icon = card.finish === "icon" || card.finish === "founder" || card.finish === "patron";
   const iconCap = icon && qualifying[BDO_CAP]?.score >= BDO_FOURTH ? BDO_CAP + 1 : BDO_CAP;
   const ovrCap = BDO_OVR_LADDER.filter((floor) => card.overall >= floor).length;
   // Reasons are factual and third-person (cards are mostly viewed by OTHERS),
