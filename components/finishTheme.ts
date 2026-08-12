@@ -75,17 +75,25 @@ export const CARD_THEME: Record<Finish, CardTheme> = {
     avatarTint: "radial-gradient(ellipse 72% 76% at 52% 40%, transparent 50%, rgba(0,0,0,.30))",
     avatarHalo: "rgba(255,47,69,.42)",
   },
+  patron: {
+    bg: "/cards/patron.png",
+    ink: "#f6f8fb",
+    glow: "rgba(59,130,246,.55)",
+    avatarTint: "radial-gradient(ellipse 72% 76% at 52% 40%, transparent 50%, rgba(0,0,0,.30))",
+    avatarHalo: "rgba(59,130,246,.42)",
+  },
 };
 
 // Per-card theme: identical to CARD_THEME for everyone except founders, who get
 // their own art, a near-white ink, and a glow/halo derived from their accent.
 export function resolveCardTheme(card: Card): CardTheme {
   const base = CARD_THEME[card.finish];
-  if (!card.founder) return base;
-  const a = card.founder.accent;
+  const meta = card.founder ?? card.patron;
+  if (!meta) return base;
+  const a = meta.accent;
   return {
-    bg: card.founder.art,
-    ink: card.founder.ink ?? "#f6f8fb",
+    bg: meta.art,
+    ink: meta.ink ?? "#f6f8fb",
     glow: rgba(a, 0.55),
     avatarTint: "radial-gradient(ellipse 72% 76% at 52% 40%, transparent 50%, rgba(0,0,0,.30))",
     avatarHalo: rgba(a, 0.42),
@@ -106,14 +114,16 @@ export const RESULT_THEME: Record<Finish, ResultTheme> = {
   toty: { glow: "rgba(90,140,255,.5)", chip: "#10254F", ink: "#CADBFF" },
   icon: { glow: "rgba(243,213,128,.45)", chip: "#2A1A45", ink: "#F3D688" },
   founder: { glow: "rgba(255,47,69,.4)", chip: "#221016", ink: "#ff6273" },
+  patron: { glow: "rgba(59,130,246,.4)", chip: "#0c1a2e", ink: "#60a5fa" },
 };
 
 // Per-card result accent: founders tint the whole scout report to their own
 // accent (red for Younes, chrome for Mawsis); everyone else uses RESULT_THEME.
 export function resolveResultTheme(card: Card): ResultTheme {
   const base = RESULT_THEME[card.finish];
-  if (!card.founder) return base;
-  return { ink: card.founder.accent, glow: rgba(card.founder.accent, 0.34), chip: base.chip };
+  const meta = card.founder ?? card.patron;
+  if (!meta) return base;
+  return { ink: meta.accent, glow: rgba(meta.accent, 0.34), chip: base.chip };
 }
 
 // ---- Duel kit clash: TOTY/TOTW vs silver, and nothing else ----
@@ -145,5 +155,6 @@ const CONFETTI: Partial<Record<Finish, string[]>> = {
 
 export function confettiPalette(card: Card): string[] {
   if (card.founder) return [card.founder.accent, "#ffffff", "#39d353"];
+  if (card.patron) return [card.patron.accent, "#ffffff", "#39d353"];
   return CONFETTI[card.finish] ?? ["#39d353", "#e9cc74", "#ffffff"];
 }
