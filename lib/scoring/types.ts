@@ -2,7 +2,7 @@ export type StatKey = "pac" | "sho" | "pas" | "dri" | "def" | "phy";
 export type Stats = Record<StatKey, number>;
 export type Profile = Record<StatKey, number>;
 
-export type Finish = "bronze" | "silver" | "gold" | "totw" | "toty" | "icon" | "founder";
+export type Finish = "bronze" | "silver" | "gold" | "totw" | "toty" | "icon" | "founder" | "patron";
 export type Position = "ST" | "RW" | "LW" | "LM" | "RM" | "CAM" | "CM" | "CDM" | "CB" | "LB" | "RB" | "GK";
 export type Family = "Forward" | "Playmaker" | "Anchor";
 
@@ -101,6 +101,8 @@ export interface FounderMeta {
   tagline: string; // tooltip + flavor, e.g. "Co-founder of gitfut"
 }
 
+export type PatronMeta = FounderMeta;
+
 export interface Card {
   login: string;
   name: string;
@@ -128,6 +130,8 @@ export interface Card {
   // Set only for gitfut founders — their bespoke card art/accent + hint metadata.
   // Optional so every other card (and previously serialized ones) stay valid.
   founder?: FounderMeta;
+  // Set only for gitfut patrons — org leaders who enabled GitFut's growth.
+  patron?: PatronMeta;
   // Per-year history behind the yearly awards (Ballon d'Or etc.). Optional so
   // cached/serialized cards from before the awards system stay valid.
   years?: YearBreakdown[];
