@@ -3,8 +3,10 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ScoutForm from "@/components/ScoutForm";
+import type { ScoutMode } from "@/components/ScoutForm";
 import CardFan from "@/components/CardFan";
 import LoadingScreen from "@/components/LoadingScreen";
+import OrgLoadingScreen from "@/components/OrgLoadingScreen";
 import dynamic from "next/dynamic";
 import FooterCredit from "@/components/FooterCredit";
 import BuyMeACoffee from "@/components/BuyMeACoffee";
@@ -35,6 +37,7 @@ export default function AppShell({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pending, setPending] = useState<string | null>(null);
+  const [pendingMode, setPendingMode] = useState<ScoutMode>("player");
   const [modalOpen, setModalOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
 
@@ -62,17 +65,23 @@ export default function AppShell({
     return () => clearTimeout(t);
   }, []);
 
-  // Scouting navigates to the canonical /<username> route. The transition keeps
-  // the loading screen up (with the mascot + puns) while the report is fetched
-  // and server-rendered; the route then plays its own reveal.
-  const handleScout = (name: string) => {
+  // Scouting navigates to the canonical /<username> route for players,
+  // or /org/<login> for organizations. The transition keeps the loading
+  // screen up while the report is fetched and server-rendered.
+  const handleScout = (name: string, mode: ScoutMode = "player") => {
     const login = name.trim().replace(/^@/, "");
     if (!login) return;
     setPending(login);
-    startTransition(() => router.push(`/${encodeURIComponent(login)}`));
+    setPendingMode(mode);
+    const path = mode === "club" ? `/org/${encodeURIComponent(login)}` : `/${encodeURIComponent(login)}`;
+    startTransition(() => router.push(path));
   };
 
-  if (isPending && pending) return <LoadingScreen login={pending} />;
+  if (isPending && pending) {
+    return pendingMode === "club"
+      ? <OrgLoadingScreen login={pending} />
+      : <LoadingScreen login={pending} />;
+  }
 
   return (
     <>
