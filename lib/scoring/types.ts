@@ -3,7 +3,7 @@ export type Stats = Record<StatKey, number>;
 export type Profile = Record<StatKey, number>;
 
 export type Finish = "bronze" | "silver" | "gold" | "totw" | "toty" | "icon" | "founder";
-export type Position = "ST" | "RW" | "CAM" | "CM" | "CDM" | "CB";
+export type Position = "ST" | "RW" | "LW" | "LM" | "RM" | "CAM" | "CM" | "CDM" | "CB" | "LB" | "RB" | "GK";
 export type Family = "Forward" | "Playmaker" | "Anchor";
 
 export interface Signals {
