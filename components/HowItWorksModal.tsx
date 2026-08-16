@@ -76,7 +76,7 @@ export default function HowItWorksModal({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-labelledby="hiw-title"
         onClick={(e) => e.stopPropagation()}
-        className="relative max-h-[88vh] w-[min(600px,100%)] overflow-auto rounded-[20px] border border-line bg-[linear-gradient(180deg,var(--color-surface-2),var(--color-panel))] p-[clamp(24px,4.5vw,40px)] shadow-[0_40px_120px_rgba(0,0,0,.6)] outline-none"
+        className="relative max-h-[88vh] w-[min(600px,100%)] overflow-auto rounded-[20px] border border-line bg-[linear-gradient(180deg,var(--color-surface-2),var(--color-panel))] p-[clamp(24px,4.5vw,40px)] shadow-[0_40px_120px_rgba(0,0,0,.6)] outline-none [scrollbar-width:thin] [scrollbar-color:var(--color-line)_transparent] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-line [&::-webkit-scrollbar-thumb:hover]:bg-gray"
         style={{
           opacity: shown ? 1 : 0,
           transform: shown ? "translateY(0) scale(1)" : "translateY(14px) scale(.985)",
