@@ -31,6 +31,7 @@ const COUNTRY: Record<string, string> = {
   algeria: "dz", "sri lanka": "lk", nepal: "np", cambodia: "kh", myanmar: "mm", ecuador: "ec",
   uruguay: "uy", "costa rica": "cr", cuba: "cu", "dominican republic": "do", guatemala: "gt",
   bolivia: "bo", paraguay: "py", armenia: "am", azerbaijan: "az", cyprus: "cy", malta: "mt", moldova: "md",
+  savoie: "sav",
 };
 
 const CITY: Record<string, string> = {
@@ -109,6 +110,7 @@ const PINNED: Record<string, string> = {
   theprimeagen: "us", // Michael Paulson — USA
   "pewdiepie-archdaemon": "se",
   t3dotgg: "us", // Theo Browne — USA
+  timeochatelain: "sav", // Savoie
 };
 
 // Country for a profile: a pinned origin (showcased accounts) wins, otherwise the

@@ -50,6 +50,7 @@ const VERDICTS: Record<Finish, string> = {
   silver: "Squad rotation",
   bronze: "One to watch",
   founder: "The architect",
+  patron: "The one who runs the show",
 };
 
 // Lightweight hover popup explaining why a value was given.
@@ -290,21 +291,24 @@ export function ReportHeader({ card, still = false }: { card: Card; still?: bool
             >
               {card.position}
             </span>
-            {card.founder && (
-              <Tip text={card.founder.tagline}>
-                <span
-                  className="font-display inline-flex items-center gap-[5px] rounded-[6px] border px-[9px] py-[3px] text-[clamp(11.5px,3vw,12.5px)] font-bold leading-none tracking-[.14em]"
-                  style={{
-                    color: card.founder.accent,
-                    borderColor: rgba(card.founder.accent, 0.45),
-                    background: rgba(card.founder.accent, 0.14),
-                  }}
-                >
-                  <Crown size={13} aria-hidden style={{ fill: card.founder.accent }} />
-                  {card.founder.label}
-                </span>
-              </Tip>
-            )}
+            {(card.founder || card.patron) && (() => {
+              const meta = card.founder ?? card.patron!;
+              return (
+                <Tip text={meta.tagline}>
+                  <span
+                    className="font-display inline-flex items-center gap-[5px] rounded-[6px] border px-[9px] py-[3px] text-[clamp(11.5px,3vw,12.5px)] font-bold leading-none tracking-[.14em]"
+                    style={{
+                      color: meta.accent,
+                      borderColor: rgba(meta.accent, 0.45),
+                      background: rgba(meta.accent, 0.14),
+                    }}
+                  >
+                    <Crown size={13} aria-hidden style={{ fill: meta.accent }} />
+                    {meta.label}
+                  </span>
+                </Tip>
+              );
+            })()}
             <span className="text-[clamp(12.5px,3.4vw,14px)] font-medium text-ink-dim">{card.archetype}</span>
             {/* @login + language travel together as one flex item so they wrap to
                 a new line as a unit — keeps a divider from ever landing orphaned

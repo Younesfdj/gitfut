@@ -1,4 +1,4 @@
-import type { Family, Finish, FounderMeta, StatKey, Stats } from "./types";
+import type { Family, Finish, FounderMeta, PatronMeta, StatKey, Stats } from "./types";
 
 export const STATS: StatKey[] = ["pac", "sho", "pas", "dri", "def", "phy"];
 
@@ -50,6 +50,7 @@ export const FINISH_LABELS: Record<Finish, string> = {
   toty: "TOTY",
   icon: "ICON",
   founder: "FOUNDER",
+  patron: "PATRON",
 };
 
 // The people who built gitfut. Keyed by LOWERCASE GitHub login; matched
@@ -75,4 +76,19 @@ export const FOUNDERS: Record<string, FounderMeta> = {
 export const FOUNDER_OVERALL: Record<string, number> = {
   younesfdj: 93,
   mawsis: 91,
+};
+
+// Org leaders who enabled GitFut's growth at scale. Same shape as founders
+// but distinct branding (blue patron card).
+export const PATRONS: Record<string, PatronMeta> = {
+  timeochatelain: {
+    art: "/cards/patron.png",
+    accent: "#3b82f6",
+    label: "PATRON",
+    tagline: "He proved himself on the pitch — now he runs things from the sideline, a true mastermind.",
+  },
+};
+
+export const PATRON_OVERALL: Record<string, number> = {
+  timeochatelain: 88,
 };

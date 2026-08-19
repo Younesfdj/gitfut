@@ -1019,6 +1019,7 @@ const UK_NATIONS: readonly Country[] = [
   { code: "sct", name: "Scotland" },
   { code: "wls", name: "Wales" },
   { code: "nir", name: "Northern Ireland" },
+  { code: "sav", name: "Savoie" },
 ];
 
 // The full pickable list: generated sovereigns + home nations, re-sorted by name

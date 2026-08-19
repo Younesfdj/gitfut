@@ -4,11 +4,13 @@ import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import Mascot from "./Mascot";
 
+export type ScoutMode = "player" | "club";
+
 interface Props {
   loading: boolean;
   error: string | null;
   scoutCount: number | null;
-  onScout: (name: string) => void;
+  onScout: (name: string, mode: ScoutMode) => void;
   onOpenModal: () => void;
 }
 
@@ -23,10 +25,11 @@ export default function ScoutForm({
   onOpenModal,
 }: Props) {
   const [name, setName] = useState("");
+  const [mode, setMode] = useState<ScoutMode>("player");
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) onScout(name);
+    if (name.trim()) onScout(name, mode);
   };
 
   return (
@@ -59,6 +62,24 @@ export default function ScoutForm({
         of 99.
       </p>
 
+      {/* Player / Club toggle */}
+      <div className="mb-[14px] flex max-w-[460px] gap-[4px] max-[860px]:mx-auto">
+        {(["player", "club"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`font-display flex-1 rounded-[10px] px-[16px] py-[8px] text-[13px] font-bold tracking-[.14em] transition ${
+              mode === m
+                ? "bg-brand text-[#04130a]"
+                : "border border-white/[0.08] bg-white/[0.025] text-ink-soft hover:bg-white/[0.05]"
+            }`}
+          >
+            {m === "player" ? "PLAYER" : "CLUB"}
+          </button>
+        ))}
+      </div>
+
       <form
         onSubmit={submit}
         className="m-0 flex max-w-[460px] flex-wrap gap-[10px] max-[860px]:mx-auto"
@@ -68,10 +89,10 @@ export default function ScoutForm({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="github username"
+            placeholder={mode === "player" ? "github username" : "organization name"}
             autoComplete="off"
             spellCheck={false}
-            aria-label="GitHub username"
+            aria-label={mode === "player" ? "GitHub username" : "GitHub organization"}
             className="font-mono h-14 w-full rounded-[14px] border-[1.5px] border-line bg-surface/70 pl-[34px] pr-5 text-[16px] font-medium text-white outline-none backdrop-blur-[4px] transition focus:border-brand focus:bg-surface focus:shadow-[0_0_0_4px_rgba(57,211,83,.16),0_0_42px_rgba(57,211,83,.24)]"
           />
         </div>
@@ -101,23 +122,47 @@ export default function ScoutForm({
       )}
 
       <div className="mt-[14px] text-[13px] text-ink-mute">
-        try{" "}
-        <button
-          type="button"
-          onClick={() => onScout("torvalds")}
-          className={exampleClass}
-        >
-          torvalds
-        </button>{" "}
-        ·{" "}
-        <button
-          type="button"
-          onClick={() => onScout("sindresorhus")}
-          className={exampleClass}
-        >
-          sindresorhus
-        </button>{" "}
-        · or your own
+        {mode === "player" ? (
+          <>
+            try{" "}
+            <button
+              type="button"
+              onClick={() => onScout("torvalds", "player")}
+              className={exampleClass}
+            >
+              torvalds
+            </button>{" "}
+            ·{" "}
+            <button
+              type="button"
+              onClick={() => onScout("sindresorhus", "player")}
+              className={exampleClass}
+            >
+              sindresorhus
+            </button>{" "}
+            · or your own
+          </>
+        ) : (
+          <>
+            try{" "}
+            <button
+              type="button"
+              onClick={() => onScout("vercel", "club")}
+              className={exampleClass}
+            >
+              vercel
+            </button>{" "}
+            ·{" "}
+            <button
+              type="button"
+              onClick={() => onScout("github", "club")}
+              className={exampleClass}
+            >
+              github
+            </button>{" "}
+            · or any org
+          </>
+        )}
       </div>
 
       {/* live tally — a broadcast-style scoreboard count; the number is the

@@ -675,3 +675,168 @@ function normalize(user: UserNode, years: YearBreakdown[]): RawPayload {
     years,
   };
 }
+
+// ── Organization fetching ─────────────────────────────────────────────
+
+export interface OrgInfo {
+  login: string;
+  name: string | null;
+  avatarUrl: string;
+  description: string | null;
+  membersWithRole: { totalCount: number };
+}
+
+export interface OrgMember {
+  login: string;
+  avatarUrl: string;
+}
+
+interface OrgNode {
+  login: string;
+  name: string | null;
+  avatarUrl: string;
+  description: string | null;
+  membersWithRole: { totalCount: number; nodes: { login: string; avatarUrl: string }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
+}
+
+const orgQuery = `
+  query Org($login: String!) {
+    organization(login: $login) {
+      login
+      name
+      avatarUrl(size: 480)
+      description
+      membersWithRole(first: 100) {
+        totalCount
+        nodes { login avatarUrl(size: 480) }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+`;
+
+const orgMembersQuery = (after: string | null) => `
+  query OrgMembers($login: String!) {
+    organization(login: $login) {
+      membersWithRole(first: 100${after ? `, after: "${after}"` : ""}) {
+        nodes { login avatarUrl(size: 480) }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+`;
+
+// Simple bot filter: skip logins that look like known bot patterns.
+const BOT_PATTERN = /\b(bot|dependabot|renovate|github-actions)\b/i;
+
+// Like gql but returns the `organization` root field instead of `user`.
+async function gqlOrg<T>(
+  query: string,
+  login: string,
+  tok: PoolToken,
+): Promise<{ organization: T | null }> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${tok.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query, variables: { login } }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    recordTokenHealth(tok.idx, res.headers);
+    if (res.status === 401) return fail("config", "GitHub token is invalid or expired.");
+    if (res.status === 403 || res.status === 429) {
+      benchToken(tok.idx, res.headers);
+      return fail("ratelimit", "GitHub rate limit hit. Try again shortly.");
+    }
+    if (!res.ok) return fail("network", `GitHub returned an error (${res.status}).`);
+
+    let body: { data?: { organization: T | null }; errors?: { type?: string; message?: string }[] };
+    try {
+      body = await res.json();
+    } catch {
+      return fail("network", "GitHub returned a malformed response.");
+    }
+
+    if (body.errors?.some((e) => e.type === "RATE_LIMITED" || e.type === "RATE_LIMIT")) {
+      benchToken(tok.idx, res.headers);
+      return fail("ratelimit", "GitHub rate limit hit. Try again shortly.");
+    }
+    if (body.errors?.length && !body.data?.organization) {
+      if (body.errors.every((e) => e.type === "NOT_FOUND"))
+        return { organization: null };
+      return fail("network", body.errors[0]?.message ?? "GitHub returned a GraphQL error.");
+    }
+
+    return { organization: body.data?.organization ?? null };
+  } catch (e) {
+    clearTimeout(timer);
+    if ((e as GithubError).type === "config" || (e as GithubError).type === "ratelimit" || (e as GithubError).type === "network") throw e;
+    return fail("network", "Couldn't reach GitHub.");
+  }
+}
+
+export async function fetchOrganization(login: string): Promise<OrgInfo> {
+  const norm = login.trim().replace(/^@/, "");
+  const pool = tokenPool();
+  if (!pool.length) fail("config", "Server is missing a GitHub token.");
+  const tok = pickToken(norm, pool) as PoolToken;
+
+  const { organization } = await gqlOrg<OrgNode>(orgQuery, norm, tok);
+  if (!organization) fail("notfound", "No GitHub organization by that name.");
+  return {
+    login: organization.login,
+    name: organization.name,
+    avatarUrl: organization.avatarUrl,
+    description: organization.description,
+    membersWithRole: { totalCount: organization.membersWithRole.totalCount },
+  };
+}
+
+export async function fetchOrganizationMembers(login: string): Promise<OrgMember[]> {
+  const norm = login.trim().replace(/^@/, "");
+  const pool = tokenPool();
+  if (!pool.length) fail("config", "Server is missing a GitHub token.");
+  let tok = pickToken(norm, pool) as PoolToken;
+
+  const members: OrgMember[] = [];
+  let cursor: string | null = null;
+  let pages = 0;
+  const MAX_PAGES = 5; // cap at 500 members to protect API limits
+
+  try {
+    for (let attempt = 0; attempt <= 1; attempt++) {
+      try {
+        while (pages < MAX_PAGES) {
+          const { organization } = await gqlOrg<OrgNode>(orgMembersQuery(cursor), norm, tok);
+          if (!organization?.membersWithRole) break;
+
+          for (const m of organization.membersWithRole.nodes) {
+            if (!BOT_PATTERN.test(m.login)) {
+              members.push({ login: m.login, avatarUrl: m.avatarUrl });
+            }
+          }
+
+          if (!organization.membersWithRole.pageInfo.hasNextPage) break;
+          cursor = organization.membersWithRole.pageInfo.endCursor;
+          pages++;
+        }
+        break; // success
+      } catch (e) {
+        if ((e as GithubError).type !== "ratelimit" || attempt > 0) throw e;
+        const fallback = await pickFailover(tok.idx, pool);
+        if (!fallback) throw e;
+        tok = fallback;
+      }
+    }
+  } catch {
+    // Best-effort: return what we have rather than failing the whole org
+  }
+
+  return members;
+}

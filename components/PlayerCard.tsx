@@ -63,7 +63,7 @@ const hideOnError: React.ReactEventHandler<HTMLImageElement> = (e) => {
   e.currentTarget.style.visibility = "hidden";
 };
 
-function PlayerCard({ card }: { card: Card }) {
+function PlayerCard({ card, adjustedOVR }: { card: Card; adjustedOVR?: number }) {
   const t = resolveCardTheme(card);
   const ink = t.ink;
   const displayName = cardDisplayName(card.name).toUpperCase();
@@ -204,7 +204,7 @@ function PlayerCard({ card }: { card: Card }) {
           color: ink,
         }}
       >
-        {pad2(card.overall)}
+        {pad2(adjustedOVR ?? card.overall)}
       </div>
 
       {/* position (centered around the left column) */}
