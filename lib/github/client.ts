@@ -598,9 +598,10 @@ export async function fetchProfile(
   try {
     user = await fetchUser(tok);
   } catch (e) {
-    // Only a rate limit is cured by another token (a timeout or 5xx would just
-    // fail again) — retry once on the healthiest token, if the pool has one.
-    if ((e as GithubError).type !== "ratelimit" || pool.length < 2) throw e;
+    // A rate-limited or invalid token can be cured by another token. Other
+    // failures (timeouts, 5xx, etc.) would just fail again on the fallback.
+    const type = (e as GithubError).type;
+    if ((type !== "ratelimit" && type !== "config") || pool.length < 2) throw e;
     const fallback = await pickFailover(tok.idx, pool);
     if (!fallback) throw e; // every other token is benched too
     tok = fallback;
