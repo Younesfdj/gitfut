@@ -1,3 +1,5 @@
+import { COUNTRIES } from "./countries";
+
 // Best-effort country from a freeform GitHub `location` string → a flag code
 // (lowercase, matching public/badges/flags/<code>.png), or null. Usually an ISO
 // 3166-1 alpha-2 code; the UK home nations resolve to their OWN flag rather than
@@ -7,6 +9,12 @@
 // US state names, and major cities. Unknowns return null (no flag) rather than
 // a wrong guess — 2-letter abbreviations are skipped on purpose (DE = Germany
 // or Delaware, etc.).
+//
+// Country NAMES come from two places: the hand-written alias map below (what
+// people actually type — "usa", "deutschland", "holland") and, as a fallback,
+// every country we already ship a flag for (lib/countries). The alias map alone
+// resolved 96 of the 253 flags we ship, so a profile that simply named its
+// country — "Dakar, Senegal", "Sarajevo, Bosnia and Herzegovina" — flew nothing.
 
 const COUNTRY: Record<string, string> = {
   "united states": "us", "united states of america": "us", usa: "us", america: "us",
@@ -27,6 +35,9 @@ const COUNTRY: Record<string, string> = {
   hungary: "hu", bulgaria: "bg", serbia: "rs", croatia: "hr", slovakia: "sk", slovenia: "si",
   lithuania: "lt", latvia: "lv", estonia: "ee", iceland: "is", luxembourg: "lu", belarus: "by",
   kazakhstan: "kz", "saudi arabia": "sa", "united arab emirates": "ae", uae: "ae", qatar: "qa",
+  // The DRC's ISO name is "Congo, the Democratic Republic of the" — an official
+  // long form nobody types, whose "Congo" head belongs to the other Congo (cg).
+  "democratic republic of the congo": "cd", "dr congo": "cd", drc: "cd",
   iran: "ir", iraq: "iq", morocco: "ma", kenya: "ke", ghana: "gh", ethiopia: "et", tunisia: "tn",
   algeria: "dz", "sri lanka": "lk", nepal: "np", cambodia: "kh", myanmar: "mm", ecuador: "ec",
   uruguay: "uy", "costa rica": "cr", cuba: "cu", "dominican republic": "do", guatemala: "gt",
@@ -77,13 +88,43 @@ function pointsToUS(segments: string[]): boolean {
   return segments.some((s) => s !== "georgia" && (COUNTRY[s] === "us" || US_STATES.has(s) || CITY[s] === "us"));
 }
 
-export function countryFromLocation(location: string | null | undefined): string | null {
-  if (!location) return null;
-  const clean = location
+// A location string and a catalog country name are folded the same way before
+// they meet, so "Côte d'Ivoire" from lib/countries matches "Côte d'Ivoire" in a
+// profile (the apostrophe is stripped from both sides, not just one).
+const fold = (s: string) =>
+  s
     .toLowerCase()
     .replace(/[^\p{L}\s,./-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+// Every country we ship a flag for, keyed by its own English name — the fallback
+// that catches the ones the hand-written map above never listed.
+//
+// Exact-segment lookups only. These names are deliberately kept OUT of MULTIWORD:
+// substring matching across the full catalog would read "Indiana" as India,
+// "Nigeria" as Niger and "Romania" as Oman.
+const ISO_NAMES: Map<string, string> = (() => {
+  const byName = new Map(COUNTRIES.map((c) => [fold(c.name), c.code] as const));
+  // Official long names carry a comma ("Tanzania, United Republic of"), which a
+  // comma-split segment can never match — so index the head as well, but only
+  // when exactly one country claims it. A bare "Congo" therefore stays the
+  // Republic (cg, its whole name), and "Virgin Islands" stays unresolved rather
+  // than guessing between the British and US ones.
+  const heads = new Map<string, string[]>();
+  for (const c of COUNTRIES) {
+    const head = fold(c.name.split(",")[0]);
+    if (head !== fold(c.name)) heads.set(head, [...(heads.get(head) ?? []), c.code]);
+  }
+  for (const [head, codes] of heads) {
+    if (codes.length === 1 && !byName.has(head)) byName.set(head, codes[0]);
+  }
+  return byName;
+})();
+
+export function countryFromLocation(location: string | null | undefined): string | null {
+  if (!location) return null;
+  const clean = fold(location);
   if (!clean) return null;
 
   const segments = clean.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
@@ -96,6 +137,13 @@ export function countryFromLocation(location: string | null | undefined): string
     if (COUNTRY[seg]) return COUNTRY[seg];
     if (US_STATES.has(seg)) return "us";
     if (CITY[seg]) return CITY[seg];
+  }
+  // Catalog names are a SECOND pass, never folded into the loop above: the
+  // curated sources are higher-confidence, so "Chad, Nebraska" still reads as
+  // the US state instead of flying Chad's flag off the first segment.
+  for (const seg of segments) {
+    const iso = ISO_NAMES.get(seg);
+    if (iso) return iso;
   }
   for (const [term, code] of MULTIWORD) {
     if (clean.includes(term)) return code;
