@@ -135,3 +135,57 @@ describe("countryForLogin", () => {
     expect(countryForLogin("some-user", "nowhere-ville")).toBeNull();
   });
 });
+
+// The hand-written alias map only ever named 95 of the 249 countries we ship a
+// flag for, so profiles that simply stated their country flew nothing. These
+// resolve off lib/countries now, without loosening what the curated sources do.
+describe("countryFromLocation — countries named straight from the flag catalog", () => {
+  it("resolves World-Cup-26 teams the alias map never listed", () => {
+    expect(countryFromLocation("Dakar, Senegal")).toBe("sn");
+    expect(countryFromLocation("Sarajevo, Bosnia and Herzegovina")).toBe("ba");
+    expect(countryFromLocation("Amman, Jordan")).toBe("jo");
+    expect(countryFromLocation("Tashkent, Uzbekistan")).toBe("uz");
+    expect(countryFromLocation("Cape Verde")).toBe("cv");
+    expect(countryFromLocation("Curaçao")).toBe("cw");
+    expect(countryFromLocation("Port-au-Prince, Haiti")).toBe("ht");
+    expect(countryFromLocation("Panama")).toBe("pa");
+  });
+
+  it("folds accents and apostrophes on both sides of the match", () => {
+    // The catalog name is "Côte d'Ivoire"; the location loses its apostrophe to
+    // the same cleaner, so the two only meet if both are folded.
+    expect(countryFromLocation("Abidjan, Côte d'Ivoire")).toBe("ci");
+  });
+
+  it("indexes an official long name's head only when one country claims it", () => {
+    // "Tanzania, United Republic of" — nothing else answers to "Tanzania".
+    expect(countryFromLocation("Dar es Salaam, Tanzania")).toBe("tz");
+    // "Congo" is the Republic's whole name, so it never leaks to the DRC…
+    expect(countryFromLocation("Congo")).toBe("cg");
+    // …which is reachable by the names people actually type instead.
+    expect(countryFromLocation("Kinshasa, DR Congo")).toBe("cd");
+    expect(countryFromLocation("Democratic Republic of the Congo")).toBe("cd");
+    // Two countries claim "Virgin Islands" — no flag beats the wrong flag.
+    expect(countryFromLocation("Virgin Islands")).toBeNull();
+  });
+
+  it("keeps the curated sources ahead of the catalog", () => {
+    // "korea" is the alias for South Korea; the catalog holds both Koreas.
+    expect(countryFromLocation("Korea")).toBe("kr");
+    // A US state anywhere in the location outranks a country name earlier in it.
+    expect(countryFromLocation("Chad, Nebraska")).toBe("us");
+    // And the existing contracts are untouched.
+    expect(countryFromLocation("Manchester, UK")).toBe("eng");
+    expect(countryFromLocation("Georgia, USA")).toBe("us");
+    expect(countryFromLocation("California, France")).toBe("us");
+  });
+
+  it("does not match catalog names as substrings", () => {
+    // The catalog is exact-segment only: loose matching would read these as
+    // India, Niger and Oman.
+    expect(countryFromLocation("Indiana")).toBe("us");
+    expect(countryFromLocation("Nigeria")).toBe("ng");
+    expect(countryFromLocation("Romania")).toBe("ro");
+    expect(countryFromLocation("Chadds Ford")).toBeNull();
+  });
+});
