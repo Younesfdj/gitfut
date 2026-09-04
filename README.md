@@ -64,6 +64,13 @@ Every card walks out in a finish:
 
 </div>
 
+
+## 🖥️ &nbsp;Run your own
+
+One click, no clone. It runs straight away on the baked sample profiles, and you can add your own read-only `GITHUB_TOKEN` afterwards for live scouting:
+
+[![Deploy on InstaPods](https://instapods.com/deploy-button.svg)](https://app.instapods.com/dashboard/pods/create?repo=https://github.com/Younesfdj/gitfut&ref=gh-gitfut)
+
 <br/>
 
 ## 🏆 &nbsp;Achievements & Awards
