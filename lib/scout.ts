@@ -2,9 +2,10 @@ import "server-only";
 import { cache } from "react";
 import { redis } from "./redis";
 import { buildCard } from "./scoring/engine";
-import { fetchProfile, type GithubError } from "./github/client";
+import { fetchProfile, fetchWindows, type GithubError } from "./github/client";
 import { signalsFromPayload } from "./github/signals";
 import { SAMPLE_CARDS } from "./github/samples";
+import { computeAwards, wcBallCandidate, WC_EDITIONS, type WcWindowTotals } from "./awards";
 import type { Card } from "./scoring/types";
 
 // Read-through Redis cache for built cards — the single path every scout surface
@@ -23,7 +24,7 @@ import type { Card } from "./scoring/types";
 // Namespaced alongside gitfut:scouts:total. The version segment lets a deploy
 // that changes buildCard's output shape or scoring invalidate every entry at
 // once (bump it) instead of serving stale-shaped cards until their TTL lapses.
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2"; // v2: cards carry years + the awards cabinet
 const CARD_TTL_SECONDS = 120 * 60; // 2h — GitHub stats move slowly; longer TTL = fewer refetches of hot profiles under load.
 
 const normalizeLogin = (username: string) => username.trim().replace(/^@/, "").toLowerCase();
@@ -63,8 +64,28 @@ const inflight = new Map<string, Promise<Card>>();
 
 async function buildFresh(username: string, login: string): Promise<Card> {
   const card = buildCard(signalsFromPayload(await fetchProfile(username)));
+  card.awards = computeAwards(card, await wcWindowsFor(card, username));
   await writeCache(login, card);
   return card;
+}
+
+// Tournament-window data for the WC Golden Ball: one extra GraphQL query, paid
+// only by candidates (strong profile + activity in a WC year) and best-effort —
+// a failure just means the Golden Ball isn't judged this scout.
+async function wcWindowsFor(card: Card, username: string): Promise<WcWindowTotals[]> {
+  if (!wcBallCandidate(card)) return [];
+  try {
+    const totals = await fetchWindows(
+      username,
+      WC_EDITIONS.map((ed) => ({ id: ed.edition, from: ed.from, to: ed.to })),
+    );
+    return WC_EDITIONS.flatMap((ed) => {
+      const t = totals[ed.edition];
+      return t ? [{ ...t, year: ed.year, edition: ed.edition }] : [];
+    });
+  } catch {
+    return [];
+  }
 }
 
 // Username -> Card, Redis-cached. Throws the same GithubError as fetchProfile

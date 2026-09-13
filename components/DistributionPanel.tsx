@@ -6,16 +6,18 @@ import { resolveResultTheme } from "./finishTheme";
 import { Tip } from "./ScoutReport";
 import type { Card } from "@/lib/scoring/types";
 
-// Small "where you stand" histogram under the scouting metrics: overall rating
-// of a uniform random sample of GitHub accounts (scored by this same engine),
-// with this card's overall marked. Sqrt-scaled bar heights so the long bronze
-// tail doesn't flatten everything right of 60 (the interesting part).
+// The "where you stand" histogram: overall rating of a uniform random sample
+// of GitHub accounts (scored by this same engine), with this card's overall
+// marked. Sqrt-scaled bar heights so the long bronze tail doesn't flatten
+// everything right of 60 (the interesting part). Renders as its own report
+// panel by default (trophy-less cards); `bare` drops the chrome for the
+// "where you rank" modal, which owns the border, title and padding.
 const W = 328;
 const H = 64;
 const PAD_TOP = 14;
 const X_MAX = 100;
 
-export default function DistributionPanel({ card }: { card: Card }) {
+export default function DistributionPanel({ card, bare = false }: { card: Card; bare?: boolean }) {
   const accent = resolveResultTheme(card).ink;
   const maxCount = Math.max(...DIST_COUNTS);
   const span = X_MAX - DIST_MIN;
@@ -29,16 +31,33 @@ export default function DistributionPanel({ card }: { card: Card }) {
   // lib/distribution for the rule-of-three bound when nothing reaches it).
   const all = standing(DIST_COUNTS, DIST_N, card.overall);
   const act = standing(DIST_ACTIVE_COUNTS, DIST_ACTIVE_N, card.overall);
+  // "Top X%" = share of the population rated at least this card's overall. When
+  // nothing in the sample reaches it, the honest claim is the rule-of-three
+  // bound: at 95% confidence the true share is below 3/n.
+  const fmtPct = (p: number) => (p >= 10 ? `${Math.round(p)}` : p >= 1 ? p.toFixed(1) : p.toFixed(2));
+  const top = (counts: number[], n: number) => {
+    const atOrAbove = counts.reduce((s, c, i) => s + (DIST_MIN + i >= card.overall ? c : 0), 0);
+    const pct = atOrAbove > 0 ? (100 * atOrAbove) / n : (100 * 3) / n;
+    return { atOrAbove, label: `Top ${atOrAbove > 0 ? "" : "< "}${fmtPct(pct)}%` };
+  };
+  const all = top(DIST_COUNTS, DIST_N);
+  const act = top(DIST_ACTIVE_COUNTS, DIST_ACTIVE_N);
+  // The locale is pinned because this string is server-rendered inside Tip: a
+  // bare toLocaleString() formats with whatever locale the runtime defaults to,
+  // so the container's "44,915" met a French browser's "44 915" on hydration and
+  // React tore the tree down (#418).
   const tipText =
-    `Higher than ${(DIST_N - all.atOrAbove).toLocaleString()} of ${DIST_N.toLocaleString()} randomly sampled GitHub users, ` +
-    `and ${(DIST_ACTIVE_N - act.atOrAbove).toLocaleString()} of the ${DIST_ACTIVE_N.toLocaleString()} who were active in the past year.`;
+    `Higher than ${(DIST_N - all.atOrAbove).toLocaleString("en-US")} of ${DIST_N.toLocaleString("en-US")} randomly sampled GitHub users, ` +
+    `and ${(DIST_ACTIVE_N - act.atOrAbove).toLocaleString("en-US")} of the ${DIST_ACTIVE_N.toLocaleString("en-US")} who were active in the past year.`;
 
   return (
-    <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-[16px]">
-      <div className="mb-[8px] flex items-center gap-[9px]">
-        <span className="h-[2px] w-[16px] rounded-full" style={{ background: accent }} />
-        <h3 className="font-display text-[11px] font-bold tracking-[.22em] text-ink-faint">DISTRIBUTION</h3>
-      </div>
+    <section className={bare ? undefined : "rounded-2xl border border-white/[0.06] bg-white/[0.02] p-[16px]"}>
+      {!bare && (
+        <div className="mb-[8px] flex items-center gap-[9px]">
+          <span className="h-[2px] w-[16px] rounded-full" style={{ background: accent }} />
+          <h3 className="font-display text-[11px] font-bold tracking-[.22em] text-ink-faint">DISTRIBUTION</h3>
+        </div>
+      )}
       <svg viewBox={`0 0 ${W} ${H + 16}`} className="w-full" role="img" aria-label={`Overall rating ${card.overall} versus a random sample of ${DIST_N} GitHub accounts`}>
         {DIST_COUNTS.map((c, i) =>
           c === 0 ? null : (

@@ -6,6 +6,8 @@ import { deEmDash } from "@/lib/text";
 import { recordScout } from "@/lib/analytics";
 import { loadCardAssets, cardTree } from "@/lib/og/renderCard";
 import { loadCardFonts } from "@/lib/og/card";
+import { groupAwards } from "@/lib/awards";
+import { loadTrophyStills, trophyShelf } from "@/lib/og/trophies";
 import type { Card } from "@/lib/scoring/types";
 
 export const runtime = "nodejs";
@@ -76,7 +78,9 @@ export default async function Image({ params }: { params: Promise<{ username: st
 
   const card = { ...raw, country: pickFlag(null, raw.country) ?? "" }; // GitHub-derived flag only
   const accent = card.founder?.accent ?? TIER_ACCENT[card.finish] ?? "#39d353";
-  const assets = await loadCardAssets(card, CARD_W);
+  const groups = groupAwards(card.awards);
+  const [assets, stills] = await Promise.all([loadCardAssets(card, CARD_W), loadTrophyStills(groups)]);
+  const shelf = groups.length ? trophyShelf({ groups, stills, tall: 92 }) : null;
 
   return new ImageResponse(
     (
@@ -97,21 +101,28 @@ export default async function Image({ params }: { params: Promise<{ username: st
         {/* left: the actual FUT card (same renderer as /<user>.png) */}
         <div style={{ display: "flex", marginRight: 64 }}>{cardTree(card, assets, CARD_W)}</div>
 
-        {/* right: identity + the "why" — the card itself carries rating/stats/flag */}
+        {/* right: identity, then the trophy cabinet (or the archetype line when
+            the profile hasn't earned any silverware yet) */}
         <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", color: "#39d353", fontSize: 24, fontWeight: 700, letterSpacing: 3 }}>GITHUB × WORLD CUP 26</div>
-          <div style={{ display: "flex", fontSize: 76, fontWeight: 700, marginTop: 14, lineHeight: 1 }}>{card.name}</div>
-          <div style={{ display: "flex", marginTop: 20, fontSize: 34, fontWeight: 700 }}>
+          <div style={{ display: "flex", fontSize: 72, fontWeight: 700, marginTop: 14, lineHeight: 1 }}>{card.name}</div>
+          <div style={{ display: "flex", marginTop: 18, fontSize: 32, fontWeight: 700 }}>
             <span style={{ display: "flex", color: accent }}>
               {card.overall} {card.finishLabel}
             </span>
             <span style={{ display: "flex", color: "#6e7681", margin: "0 14px" }}>·</span>
             <span style={{ display: "flex", color: "#c9d1d9" }}>{card.archetype}</span>
           </div>
-          <div style={{ display: "flex", fontSize: 30, color: "#a8b3bd", marginTop: 22, lineHeight: 1.3, maxWidth: 600 }}>
-            {deEmDash(card.archetypeBlurb)}.
-          </div>
-          <div style={{ display: "flex", fontSize: 26, color: "#6e7681", marginTop: 32 }}>gitfut.com/{card.login}</div>
+
+          {shelf ? (
+            <div style={{ display: "flex", marginTop: 36 }}>{shelf}</div>
+          ) : (
+            <div style={{ display: "flex", fontSize: 30, color: "#a8b3bd", marginTop: 22, lineHeight: 1.3, maxWidth: 600 }}>
+              {deEmDash(card.archetypeBlurb)}.
+            </div>
+          )}
+
+          <div style={{ display: "flex", fontSize: 26, color: "#6e7681", marginTop: 34 }}>gitfut.com/{card.login}</div>
         </div>
       </div>
     ),

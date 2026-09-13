@@ -15,7 +15,7 @@ vi.mock("@/lib/redis", () => ({
   },
 }));
 
-import { fetchProfile } from "@/lib/github/client";
+import { fetchProfile, fetchWindows } from "@/lib/github/client";
 import { hashLogin } from "@/lib/github/tokens";
 
 const POOL = ["tokA", "tokB", "tokC", "tokD"];
@@ -222,6 +222,39 @@ describe("fetchProfile request timeout", () => {
   });
 });
 
+describe("fetchWindows (WC tournament periods)", () => {
+  const W = { totalCommitContributions: 7, totalIssueContributions: 1, totalPullRequestContributions: 2, totalPullRequestReviewContributions: 1, restrictedContributionsCount: 3 };
+  const windows = [
+    { id: "Qatar 2022", from: "2022-11-20T00:00:00Z", to: "2022-12-18T23:59:59Z" },
+    { id: "North America 2026", from: "2026-06-11T00:00:00Z", to: "2026-07-19T23:59:59Z" },
+  ];
+
+  it("fetches all windows in one aliased request, keyed back by id", async () => {
+    scriptFetch((_t, body) =>
+      body.includes("query Windows(") ? ok({ data: { user: { w0: W, w1: W } } }) : okFor(body),
+    );
+    const got = await fetchWindows(LOGIN, windows);
+    expect(calls.filter((c) => c.body.includes("query Windows(")).length).toBe(1);
+    expect(got["Qatar 2022"]).toMatchObject({ commits: 7, prs: 2, reviews: 1, issues: 1, restricted: 3 });
+    expect(got["North America 2026"]).toBeDefined();
+  });
+
+  it("retries windows individually when the pooled request is resource-rejected", async () => {
+    let first = true;
+    scriptFetch((_t, body) => {
+      if (!body.includes("query Windows(")) return okFor(body);
+      if (first) {
+        first = false;
+        return ok({ data: { user: null }, errors: [{ type: "RESOURCE_LIMITS_EXCEEDED", message: "too heavy" }] });
+      }
+      return ok({ data: { user: { w0: W } } });
+    });
+    const got = await fetchWindows(LOGIN, windows);
+    expect(calls.filter((c) => c.body.includes("query Windows(")).length).toBe(3); // 1 pooled + 2 singles
+    expect(Object.keys(got)).toHaveLength(2);
+  });
+});
+
 describe("fetchProfile GraphQL error triage + resource-limit fallback", () => {
   // Basics = the USER node minus its contributions block, what basicsQuery returns.
   const BASICS = Object.fromEntries(Object.entries(USER).filter(([k]) => k !== "recent"));
@@ -381,6 +414,9 @@ describe("fetchProfile GraphQL error triage + resource-limit fallback", () => {
     // createdAt 2023 -> years 2023..2026: 1 failed batch + 4 single-year retries.
     expect(calls.filter((c) => c.body.includes("query Lifetime(")).length).toBe(5);
     expect(payload.lifetimeContributions).toBe(10 * 4);
+    // The per-year breakdown behind it survives the retry, oldest first.
+    expect(payload.years.map((y) => y.year)).toEqual([2023, 2024, 2025, 2026]);
+    expect(payload.years[0]).toMatchObject({ commits: 5, prs: 2, reviews: 1, issues: 1, restricted: 1 });
   });
 });
 

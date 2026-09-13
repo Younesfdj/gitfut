@@ -1,5 +1,6 @@
 import "server-only";
 import { tokenPool, pickToken, pickFailover, recordTokenHealth, benchToken, type PoolToken } from "./tokens";
+import type { YearBreakdown } from "@/lib/scoring/types";
 
 // Server-only GitHub client, on the GraphQL API (api.github.com/graphql).
 // GraphQL is authenticated-only, so a token is REQUIRED — which also puts
@@ -72,6 +73,7 @@ export interface RawPayload {
   recentRestricted: number; // last-year private contributions (count only)
   recentActiveDays: number;
   lifetimeContributions: number; // all years, all types, incl. private
+  years: YearBreakdown[]; // per-year breakdown behind it, oldest first (failed years omitted)
 }
 
 const ENDPOINT = "https://api.github.com/graphql";
@@ -454,55 +456,115 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-const sumContrib = (c: YearContrib) =>
-  c.totalCommitContributions +
-  c.totalIssueContributions +
-  c.totalPullRequestContributions +
-  c.totalPullRequestReviewContributions +
-  c.restrictedContributionsCount;
+export const yearTotal = (y: YearBreakdown) =>
+  y.commits + y.prs + y.reviews + y.issues + y.restricted;
 
-// Sum of every year's contributions (commits + issues + PRs + reviews + private).
-// Each batch is best-effort: a batch that fails after its retry contributes 0
-// rather than failing the scout.
-async function fetchLifetime(
+// Every year's contribution breakdown (commits, PRs, reviews, issues, private)
+// — the substrate for the lifetime total AND the yearly awards. Each batch is
+// best-effort: a year that fails after its retry is OMITTED (not zeroed), so
+// awards logic can tell "quiet year" from "unknown year".
+async function fetchYears(
   login: string,
   tok: PoolToken,
   createdYear: number,
   currentYear: number,
   nowIso: string,
-): Promise<number> {
-  const years: number[] = [];
-  for (let y = Math.max(createdYear, GITHUB_EPOCH_YEAR); y <= currentYear; y++) years.push(y);
+): Promise<YearBreakdown[]> {
+  const wanted: number[] = [];
+  for (let y = Math.max(createdYear, GITHUB_EPOCH_YEAR); y <= currentYear; y++) wanted.push(y);
 
-  const yearsTotal = async (batch: number[]): Promise<number> => {
+  const yearRows = async (batch: number[]): Promise<YearBreakdown[]> => {
     const { user } = await gql<Record<string, YearContrib | null>>(
       lifetimeQuery(batch, currentYear, nowIso),
       login,
       tok,
     );
-    if (!user) return 0;
-    return batch.reduce((s, y) => {
+    if (!user) return [];
+    return batch.flatMap((y) => {
       const c = user[`y${y}`];
-      return c ? s + sumContrib(c) : s;
-    }, 0);
+      if (!c) return [];
+      return [{
+        year: y,
+        commits: c.totalCommitContributions,
+        prs: c.totalPullRequestContributions,
+        reviews: c.totalPullRequestReviewContributions,
+        issues: c.totalIssueContributions,
+        restricted: c.restrictedContributionsCount,
+      }];
+    });
   };
 
-  const sums = await Promise.all(
-    chunk(years, LIFETIME_BATCH).map(async (batch) => {
+  const rows = await Promise.all(
+    chunk(wanted, LIFETIME_BATCH).map(async (batch) => {
       try {
-        return await yearsTotal(batch);
+        return await yearRows(batch);
       } catch {
         // Aliased years pool their resource cost, so one hyperactive year sinks
         // its whole batch — retry each year alone (own request, own budget) and
-        // let only the truly over-budget years degrade to 0.
+        // drop only the truly over-budget years.
         const singles = await Promise.all(
-          batch.map((y) => yearsTotal([y]).catch(() => 0)),
+          batch.map((y) => yearRows([y]).catch(() => [] as YearBreakdown[])),
         );
-        return singles.reduce((a, b) => a + b, 0);
+        return singles.flat();
       }
     }),
   );
-  return sums.reduce((a, b) => a + b, 0);
+  return rows.flat().sort((a, b) => a.year - b.year);
+}
+
+// Contribution totals inside arbitrary date windows (the WC Golden Ball's
+// tournament periods) — ONE aliased query for all windows. Only called for
+// award candidates (see lib/scout), so the typical scout never pays it.
+// Best-effort like fetchYears: on a pooled resource rejection, retry windows
+// individually and drop only the ones that still refuse.
+export interface DateWindow {
+  id: string;
+  from: string;
+  to: string;
+}
+
+function windowsQuery(windows: DateWindow[]): string {
+  const aliases = windows
+    .map(
+      (w, i) =>
+        `w${i}: contributionsCollection(from: "${w.from}", to: "${w.to}") { totalCommitContributions totalIssueContributions totalPullRequestContributions totalPullRequestReviewContributions restrictedContributionsCount }`,
+    )
+    .join("\n");
+  return `query Windows($login: String!) { user(login: $login) { ${aliases} } }`;
+}
+
+export async function fetchWindows(
+  username: string,
+  windows: DateWindow[],
+): Promise<Record<string, Omit<YearBreakdown, "year">>> {
+  const login = username.trim().replace(/^@/, "");
+  const pool = tokenPool();
+  if (!pool.length || !windows.length) return {};
+  const tok = pickToken(login, pool) as PoolToken;
+
+  const rows = async (ws: DateWindow[]) => {
+    const { user } = await gql<Record<string, YearContrib | null>>(windowsQuery(ws), login, tok);
+    const out: Record<string, Omit<YearBreakdown, "year">> = {};
+    ws.forEach((w, i) => {
+      const c = user?.[`w${i}`];
+      if (c)
+        out[w.id] = {
+          commits: c.totalCommitContributions,
+          prs: c.totalPullRequestContributions,
+          reviews: c.totalPullRequestReviewContributions,
+          issues: c.totalIssueContributions,
+          restricted: c.restrictedContributionsCount,
+        };
+    });
+    return out;
+  };
+
+  try {
+    return await rows(windows);
+  } catch {
+    const singles = await Promise.all(windows.map((w) => rows([w]).catch(() => ({}))));
+    return Object.assign({}, ...singles);
+  }
 }
 
 export async function fetchProfile(
@@ -547,7 +609,7 @@ export async function fetchProfile(
   if (!user) return fail("notfound", "No GitHub user by that name.");
 
   const createdYear = new Date(user.createdAt).getUTCFullYear();
-  const lifetimeContributions = await fetchLifetime(
+  const years = await fetchYears(
     login,
     tok,
     createdYear,
@@ -555,10 +617,11 @@ export async function fetchProfile(
     now.toISOString(),
   );
 
-  return normalize(user, lifetimeContributions);
+  return normalize(user, years);
 }
 
-function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
+function normalize(user: UserNode, years: YearBreakdown[]): RawPayload {
+  const lifetimeContributions = years.reduce((s, y) => s + yearTotal(y), 0);
   const repos: RawRepo[] = user.repositories.nodes.map((n) => ({
     stars: n.stargazerCount ?? 0,
     language: n.primaryLanguage?.name ?? null,
@@ -609,5 +672,6 @@ function normalize(user: UserNode, lifetimeContributions: number): RawPayload {
     recentRestricted: user.recent.restrictedContributionsCount,
     recentActiveDays,
     lifetimeContributions,
+    years,
   };
 }

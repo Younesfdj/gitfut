@@ -130,8 +130,14 @@ export default function ScoutForm({
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-60" />
                 <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-brand" />
               </span>
-              <span className="font-display text-[20px] leading-none tabular-nums text-ink">
+              <span className="font-display relative text-[20px] leading-none tabular-nums text-ink">
                 {scoutCount.toLocaleString("en-US")}
+                <img
+                    src="/count-underline.svg"
+                    alt=""
+                    aria-hidden
+                    className="animate-ink pointer-events-none absolute left-1/2 top-full -mt-[2px] h-[20px] w-[110%] max-w-none -translate-x-1/2"
+                  />
               </span>
               <span className="text-[12px] text-ink-mute">cards rated</span>
             </span>

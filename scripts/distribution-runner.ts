@@ -242,6 +242,7 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
     recentRestricted: user.recent.restrictedContributionsCount,
     recentActiveDays,
     lifetimeContributions,
+    years: [], // per-year breakdown feeds awards, not scoring — the runner only scores
   };
 }
 

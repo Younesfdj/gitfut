@@ -38,6 +38,7 @@
   /* motion */
   --animate-flood: flood 18s ease-in-out infinite alternate;
   --animate-glow: glow 3.4s ease-in-out infinite;
+  --animate-ink: ink-in 1.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-card-reveal: rise-soft 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-walkout: walkout 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-rise-soft: rise-soft 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -90,6 +91,16 @@
 }
 
 /* ---- result card ambient glow pulse ---- */
+/* the milestone underline being laid down, left to right */
+@keyframes ink-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
 @keyframes glow {
   0%,
   100% {
@@ -385,4 +396,16 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* Ball-cursor toy (components/BallCursor): the real cursor hides only while
+   the user is actively dribbling — never by default. */
+html.gf-ball-cursor,
+html.gf-ball-cursor * {
+  cursor: none !important;
+}
+html.gf-ball-cursor input,
+html.gf-ball-cursor textarea,
+html.gf-ball-cursor [contenteditable="true"] {
+  cursor: text !important;
 }
