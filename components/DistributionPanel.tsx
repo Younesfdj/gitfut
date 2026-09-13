@@ -1,6 +1,7 @@
 "use client";
 
 import { DIST_ACTIVE_COUNTS, DIST_ACTIVE_N, DIST_COUNTS, DIST_MIN, DIST_N } from "@/lib/distribution-data";
+import { standing } from "@/lib/distribution";
 import { resolveResultTheme } from "./finishTheme";
 import { Tip } from "./ScoutReport";
 import type { Card } from "@/lib/scoring/types";
@@ -26,6 +27,10 @@ export default function DistributionPanel({ card, bare = false }: { card: Card; 
 
   const meX = xFor(card.overall + 0.5);
 
+  // "Top X%" = share of the population rated at least this card's overall (see
+  // lib/distribution for the rule-of-three bound when nothing reaches it).
+  const all = standing(DIST_COUNTS, DIST_N, card.overall);
+  const act = standing(DIST_ACTIVE_COUNTS, DIST_ACTIVE_N, card.overall);
   // "Top X%" = share of the population rated at least this card's overall. When
   // nothing in the sample reaches it, the honest claim is the rule-of-three
   // bound: at 95% confidence the true share is below 3/n.
