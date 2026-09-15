@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Link2, Repeat, Share2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Copy, Download, ImageDown, Link2, Repeat, Share2 } from "lucide-react";
+import { toPng, toBlob } from "html-to-image";
+import { renderCardImage } from "@/lib/capture";
+import DuelStoryFrame from "./DuelStoryFrame";
 import { dominanceShare, tallyRows, type Duel, type DuelSide } from "@/lib/duel";
 import type { Card } from "@/lib/scoring/types";
 import PlayerCard from "./PlayerCard";
@@ -20,17 +23,23 @@ import { useDuelReveal } from "@/hooks/useReveal";
 import { useShareActions } from "@/hooks/useShareActions";
 import { resolvedRows } from "@/lib/reveal";
 import { formatCount } from "@/lib/format";
-import { duelIntentUrl, duelSharePayload, duelUrl } from "@/lib/share";
+import { duelIntentUrl, duelSharePayload, duelUrl, nativeSharePayload } from "@/lib/share";
 import { AWARD_META, groupAwards, type AwardGroup } from "@/lib/awards";
 import AwardModal from "./AwardModal";
 import TrophySprite, { AWARD_SPRITES } from "./TrophySprite";
 
+type ActionId = "download" | "copy" | "story" | "link";
+const ACTION_COPY: Record<ActionId, { name: string; busy: string; done: string }> = {
+  download: { name: "Download", busy: "Saving…", done: "Saved" },
+  story: { name: "Story", busy: "Rendering…", done: "Done" },
+  copy: { name: "Copy image", busy: "Copying…", done: "Copied" },
+  link: { name: "Copy link", busy: "…", done: "Link copied" },
+};
+
+const MENU_ITEM = "flex w-full items-center gap-[9px] rounded-lg px-[11px] py-[9px] text-left text-[12.5px] font-semibold text-ink-soft transition-colors hover:bg-white/[0.06] hover:text-white";
+
 const CARD_WIDTH = "clamp(150px, min(24vw, 34vh), 292px)";
 
-// One shootout stat as a butterfly bar: the two bars grow out from the centre
-// label toward each value (the FIFA head-to-head graphic, not a table row).
-// Until the sequence reaches it the values are masked and the bars empty —
-// layout stays stable, only the reveal moves.
 function StatBar({
   row,
   resolved,
@@ -42,8 +51,6 @@ function StatBar({
   aAccent: string;
   bAccent: string;
 }) {
-  // The winner's dot is a non-color cue too: same-tier duels (gold vs gold)
-  // and color-blind viewers still read who took the row by dot presence.
   const value = (side: DuelSide, accent: string) => {
     const won = row.winner === side;
     const lost = row.winner !== null && !won;
@@ -132,7 +139,6 @@ const Masked = () => (
   </span>
 );
 
-// A scoreboard digit that pops on change (a goal going in).
 function ScoreDigit({ value, accent }: { value: number; accent: string }) {
   return (
     <span
@@ -158,8 +164,15 @@ export default function DuelView({
   const { challenger, opponent, rows, winner, onPenalties, training } = duel;
 
   const [activeAward, setActiveAward] = useState<AwardGroup | null>(null);
-  // Kit clash (see finishTheme): ONLY a toty/totw vs silver pairing recolors —
-  // the toty side wears its saturated tier blue so the sides stay readable.
+  const [done, setDone] = useState<ActionId | null>(null);
+  const [busy, setBusy] = useState<ActionId | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const caretRef = useRef<HTMLButtonElement>(null);
+  const openedByKey = useRef(false);
+
+  const targetRef = useRef<HTMLElement>(null);
+  const storyRef = useRef<HTMLDivElement>(null);
   const { home: aTheme, away: bTheme } = duelThemes(challenger, opponent);
   const { phase, skip } = useDuelReveal();
   const settled = phase.kind === "settled";
@@ -167,15 +180,9 @@ export default function DuelView({
   const shown = resolvedRows(phase);
   const shared = new Set(duel.sharedPlaystyles);
 
-  // Scoreline as currently visible: only rows the shootout has resolved count,
-  // so the scoreboard and the stadium light always agree with what's on screen.
   const visible = rows.slice(0, shown);
   const { a: scoreA, b: scoreB } = tallyRows(visible);
-
-  // Dominance: margin-weighted, resolved rows only (see lib/duel) — it ticks
-  // live with the shootout and never runs ahead of the page.
   const pctA = dominanceShare(visible);
-
   const focus: DuelSide | null = stamped ? winner : null;
 
   const winnerCard: Card | null =
@@ -190,21 +197,197 @@ export default function DuelView({
   const resultAccent = winnerCard ? winnerTheme.ink : "var(--color-ink-faint)";
   const headlineHex = winnerCard ? winnerTheme.ink : "#8b949e";
 
-  // Share-row gestures — shared with CardActions via the same hook (score-free
-  // duel payload/intent from lib/share).
-  const { canNativeShare, nativeShare, copyLink, linkCopied } = useShareActions({
-    getSharePayload: () =>
-      duelSharePayload(challenger.login, opponent.login),
+  const splitHalf = {
+    style: { color: resultAccent, borderColor: `${resultAccent}66`, background: `${resultAccent}1f` },
+    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.currentTarget.style.background = `${resultAccent}33`;
+    },
+    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.currentTarget.style.background = `${resultAccent}1f`;
+    },
+  };
+
+  const { canNativeShare, nativeShare, copyLink } = useShareActions({
+    getSharePayload: async () => {
+      const node = targetRef.current;
+      const payload = duelSharePayload(challenger.login, opponent.login);
+      if (node && "canShare" in navigator) {
+        const blob = await renderCardImage(node, async (n) => {
+          n.style.minHeight = "0";
+          n.style.paddingTop = "40px";
+          n.style.paddingBottom = "40px";
+          const bg = n.querySelector<HTMLElement>("[data-capture-bg]");
+          if (bg) bg.style.position = "absolute";
+          n.querySelectorAll<HTMLElement>("[data-hide-capture]").forEach((el) => {
+            el.style.display = "none";
+          });
+          return toBlob(n, { pixelRatio: 2, cacheBust: true });
+        });
+        if (blob) {
+          const file = new File([blob], `${challenger.login}-vs-${opponent.login}-gitfut.png`, {
+            type: "image/png",
+          });
+          if (navigator.canShare?.({ files: [file] })) {
+            return { ...payload, files: [file] };
+          }
+        }
+      }
+      return payload;
+    },
     getIntentUrl: () => duelIntentUrl(challenger.login, opponent.login),
     getCopyUrl: () => duelUrl(challenger.login, opponent.login),
   });
 
-  const status =
-    !stamped && shown === 0 ? "KICK-OFF" : !stamped ? "LIVE" : "FULL TIME";
+  useEffect(() => {
+    if (!menuOpen) return;
+    if (openedByKey.current) {
+      menuRef.current?.querySelector<HTMLButtonElement>("[role='menuitem']")?.focus();
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        caretRef.current?.focus();
+      }
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [menuOpen]);
 
-  // Both header names share one size — the longer login sets it (a fixture
-  // reads as one pair, not two weights) — shrinking smoothly for long handles
-  // so neither side can shove the VS burst off the page's centre axis.
+  const onMenuKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>("[role='menuitem']") ?? [],
+    );
+    if (!items.length) return;
+    const i = items.indexOf(document.activeElement as HTMLButtonElement);
+    items[e.key === "ArrowDown" ? (i + 1) % items.length : i <= 0 ? items.length - 1 : i - 1]?.focus();
+  };
+
+  const finish = (id: ActionId) => {
+    setDone(id);
+    setTimeout(() => setDone((d) => (d === id ? null : d)), 1500);
+  };
+
+  const track = async (id: ActionId, run: () => Promise<ActionId | void>) => {
+    if (busy) return;
+    setBusy(id);
+    setMenuOpen(false);
+    try {
+      const completedAs = await run();
+      finish(completedAs ?? id);
+    } catch (e) {
+      console.error(`[gitfut] duel ${id} failed:`, e);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const shareStory = () =>
+    track("story", async () => {
+      const node = storyRef.current;
+      if (!node) return;
+      const blob = await renderCardImage(node, async (n) => {
+        const b = await toBlob(n, { pixelRatio: 1, cacheBust: true });
+        if (!b) throw new Error("render returned no image");
+        return b;
+      });
+      const file = new File([blob], `${challenger.login}-vs-${opponent.login}-gitfut-story.png`, {
+        type: "image/png",
+      });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+        });
+      } else {
+        // Fallback for desktop: download it
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.download = file.name;
+        a.href = url;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    });
+
+  const downloadDuelPng = async () => {
+    const node = targetRef.current;
+    if (!node) return;
+    const url = await renderCardImage(node, (n) => {
+      n.style.minHeight = "0";
+      n.style.paddingTop = "40px";
+      n.style.paddingBottom = "40px";
+      const bg = n.querySelector<HTMLElement>("[data-capture-bg]");
+      if (bg) bg.style.position = "absolute";
+      n.querySelectorAll<HTMLElement>("[data-hide-capture]").forEach((el) => {
+        el.style.display = "none";
+      });
+      return toPng(n, { pixelRatio: 2, cacheBust: true });
+    });
+    const a = document.createElement("a");
+    a.download = `${challenger.login}-vs-${opponent.login}-gitfut.png`;
+    a.href = url;
+    a.click();
+  };
+
+  const downloadPng = () => track("download", downloadDuelPng);
+
+  const copyImage = () =>
+    track("copy", async () => {
+      const node = targetRef.current;
+      if (!node) return;
+
+      const canCopyImage =
+        typeof ClipboardItem !== "undefined" &&
+        typeof navigator.clipboard?.write === "function";
+
+      if (canCopyImage) {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "image/png": renderCardImage(
+                node,
+                async (n) => {
+                  n.style.minHeight = "0";
+                  n.style.paddingTop = "40px";
+                  n.style.paddingBottom = "40px";
+                  const bg = n.querySelector<HTMLElement>("[data-capture-bg]");
+                  if (bg) bg.style.position = "absolute";
+                  n.querySelectorAll<HTMLElement>("[data-hide-capture]").forEach((el) => {
+                    el.style.display = "none";
+                  });
+                  const blob = await toBlob(n, { pixelRatio: 2, cacheBust: true });
+                  if (!blob) throw new Error("render returned no image");
+                  return blob;
+                },
+                { transparent: false },
+              ),
+            }),
+          ]);
+          return;
+        } catch (error) {
+          console.warn("[gitfut] image clipboard unavailable; using fallback:", error);
+        }
+      }
+
+      if (await copyLink()) return "link";
+
+      await downloadDuelPng();
+      return "download";
+    });
+
+  const copyCardLink = () =>
+    track("link", async () => {
+      if (!(await copyLink())) throw new Error("clipboard unavailable");
+    });
+
   const nameLen = Math.max(challenger.login.length, opponent.login.length);
   const nameSize = `clamp(16px, ${Math.min(4.2, 42 / nameLen)}vw, ${Math.min(44, 460 / nameLen)}px)`;
 
@@ -344,9 +527,16 @@ export default function DuelView({
     );
   };
 
+  const mainLabel = busy
+    ? ACTION_COPY[busy].busy
+    : done
+      ? ACTION_COPY[done].done
+      : "Download";
+
   return (
     <>
       <main
+        ref={targetRef}
         // Tap-anywhere-to-skip, but never hijack a real control (links, the
         // star button, the radar's stat targets) — those keep their own click.
         onClick={
@@ -366,6 +556,7 @@ export default function DuelView({
             brightens as that side scores — then flares for the winner at full
             time. Draws keep the house lights even. */}
         <div
+          data-capture-bg
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10"
           style={{ background: "var(--color-bg)" }}
@@ -388,7 +579,7 @@ export default function DuelView({
         </div>
 
         {/* top bar — mirrors the scout report's frame */}
-        <div className="mb-[8px] mt-[clamp(8px,2vh,18px)] flex w-full shrink-0 items-center justify-between gap-[10px]">
+        <div data-hide-capture className="mb-[8px] mt-[clamp(8px,2vh,18px)] flex w-full shrink-0 items-center justify-between gap-[10px]">
           <div className="flex items-center gap-[10px]">
             <Link
               href="/"
@@ -665,7 +856,7 @@ export default function DuelView({
                     <span className="relative">SHARE THE DUEL</span>
                   </button>
                 )}
-                <div className="grid w-full grid-cols-3 gap-[8px]">
+                <div className="flex w-full gap-[8px]">
                   <button
                     type="button"
                     onClick={() =>
@@ -677,36 +868,92 @@ export default function DuelView({
                     }
                     title="Share on X"
                     aria-label="Share on X"
-                    className="group flex items-center justify-center gap-[7px] rounded-xl border border-line bg-white/[0.03] py-[11px] text-[12.5px] font-semibold text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-white/25 hover:bg-white/[0.07] hover:text-white active:translate-y-0 active:scale-[.98]"
+                    className="group flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-line bg-white/[0.03] text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-white/25 hover:bg-white/[0.07] hover:text-white active:translate-y-0 active:scale-[.96]"
                   >
-                    <XLogo size={14} />
-                    <span className="max-[360px]:hidden">X</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={copyLink}
-                    title="Copy link to this duel"
-                    aria-label="Copy link to this duel"
-                    className="group flex items-center justify-center gap-[7px] rounded-xl border border-line bg-white/[0.03] py-[11px] text-[12.5px] font-semibold text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-brand/50 hover:bg-brand/[0.08] hover:text-white active:translate-y-0 active:scale-[.98]"
-                  >
-                    {linkCopied ? (
-                      <Check size={14} className="text-brand" />
-                    ) : (
-                      <Link2 size={14} />
-                    )}
-                    <span className="max-[360px]:hidden">
-                      {linkCopied ? "Copied" : "Copy link"}
-                    </span>
+                    <XLogo size={16} />
                   </button>
                   <Link
                     href={`/${opponent.login}/vs/${challenger.login}`}
                     title="Rematch with the corners swapped"
                     aria-label="Rematch with the corners swapped"
-                    className="group flex items-center justify-center gap-[7px] rounded-xl border border-line bg-white/[0.03] py-[11px] text-[12.5px] font-semibold text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-white/25 hover:bg-white/[0.07] hover:text-white active:translate-y-0 active:scale-[.98]"
+                    className="group flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-line bg-white/[0.03] text-ink-soft transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-white/25 hover:bg-white/[0.07] hover:text-white active:translate-y-0 active:scale-[.96]"
                   >
-                    <Repeat size={14} />
-                    <span className="max-[360px]:hidden">Swap corners</span>
+                    <Repeat size={16} />
                   </Link>
+                  <div ref={menuRef} className="relative flex min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={downloadPng}
+                      disabled={!!busy}
+                      title="Download duel as image"
+                      aria-label="Download duel as image"
+                      className={`group flex h-[46px] min-w-0 flex-1 items-center justify-center gap-[8px] rounded-tl-xl border border-r-0 text-[13.5px] font-bold tracking-[.02em] transition-all duration-200 ease-out disabled:opacity-70 ${menuOpen ? "" : "rounded-bl-xl"}`}
+                      {...splitHalf}
+                    >
+                      {busy ? (
+                        <span
+                          className="h-[15px] w-[15px] shrink-0 animate-spin rounded-full border-[1.5px]"
+                          style={{ borderColor: `${resultAccent}40`, borderTopColor: resultAccent }}
+                        />
+                      ) : done ? (
+                        <Check size={16} strokeWidth={2.6} className="shrink-0" />
+                      ) : (
+                        <Download
+                          size={16}
+                          strokeWidth={2.4}
+                          className="shrink-0 transition-transform group-hover:translate-y-[1px]"
+                        />
+                      )}
+                      <span className="truncate">{mainLabel}</span>
+                    </button>
+                    <button
+                      ref={caretRef}
+                      type="button"
+                      onClick={(e) => {
+                        openedByKey.current = e.detail === 0;
+                        setMenuOpen((o) => !o);
+                      }}
+                      disabled={!!busy}
+                      title="More export options"
+                      aria-label="More export options"
+                      aria-haspopup="menu"
+                      aria-expanded={menuOpen}
+                      className={`flex h-[46px] w-[34px] shrink-0 items-center justify-center rounded-tr-xl border transition-all duration-200 ease-out disabled:opacity-70 ${menuOpen ? "" : "rounded-br-xl"}`}
+                      {...splitHalf}
+                    >
+                      <ChevronDown
+                        size={15}
+                        strokeWidth={2.4}
+                        className={`transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {menuOpen && (
+                      <div
+                        role="menu"
+                        aria-label="Export options"
+                        onKeyDown={onMenuKeyDown}
+                        className="absolute inset-x-0 top-full z-20 overflow-hidden rounded-b-xl border border-t-0 bg-bg-deep p-[4px] shadow-[0_14px_36px_-10px_rgba(0,0,0,.8)]"
+                        style={{
+                          borderColor: `${resultAccent}66`,
+                          backgroundImage: `linear-gradient(${resultAccent}1f, ${resultAccent}1f)`,
+                          animation: "pop .16s cubic-bezier(.16,1,.3,1) both",
+                        }}
+                      >
+                        <button type="button" role="menuitem" onClick={shareStory} className={MENU_ITEM}>
+                          <ImageDown size={14} className="shrink-0" />
+                          Story format
+                        </button>
+                        <button type="button" role="menuitem" onClick={copyImage} className={MENU_ITEM}>
+                          <Copy size={14} className="shrink-0" />
+                          Copy image
+                        </button>
+                        <button type="button" role="menuitem" onClick={copyCardLink} className={MENU_ITEM}>
+                          <Link2 size={14} className="shrink-0" />
+                          Copy link
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -715,7 +962,7 @@ export default function DuelView({
           {corner(opponent, bTheme, "opponent")}
         </div>
 
-        <footer className="relative z-[2] mt-auto flex flex-none items-center justify-center p-[clamp(12px,2.6vh,24px)]">
+        <footer data-hide-capture className="relative z-[2] mt-auto flex flex-none items-center justify-center p-[clamp(12px,2.6vh,24px)]">
           <FooterCredit />
         </footer>
       </main>
@@ -730,6 +977,11 @@ export default function DuelView({
           onClose={() => setActiveAward(null)}
         />
       )}
+
+      {/* 1080×1920 Story capture frame (off-screen, rendered at native size) */}
+      <div style={{ position: "fixed", left: "-9999px", top: "-9999px" }}>
+        <DuelStoryFrame ref={storyRef} duel={duel} />
+      </div>
     </>
   );
 }
