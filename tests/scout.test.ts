@@ -71,7 +71,8 @@ describe("scoutCard single-flight", () => {
     const p = payload("torvalds");
     d.resolve(p);
     const [a, b, c] = await calls;
-    expect(a).toEqual(p);
+    expect(a).toEqual({ ...p, awards: [] }); // awards are computed onto the fresh card
+
     expect(b).toBe(a); // all three share the one built object
     expect(c).toBe(a);
     expect(fetchProfile).toHaveBeenCalledTimes(1);

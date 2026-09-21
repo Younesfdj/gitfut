@@ -66,6 +66,67 @@ Every card walks out in a finish:
 
 <br/>
 
+## 🏆 &nbsp;Achievements & Awards
+
+Standout cards earn trophies, shown on the scout report and carried into duels like a boxer's belts — a duel showcases what each player brings, it never awards anything itself. Click a trophy for its story: every win is attached to a year (or a World Cup edition) with the reason it was given. Rendered from pre-baked rotating sprites (no 3D runtime — see `scripts/bake-award-sprites.ts`):
+
+| Award | Won for |
+| :---: | :--- |
+| **Ballon d'Or** | A calendar year that towers over the rest of your career — judged against your own history (log-scaled across commits, PRs, reviews and issues, so volume spam can't buy it). Repeatable, but every extra one is harder to win: up to 3, and Icons can take a 4th. |
+| **WC Golden Ball** | Best player of a World Cup — rising above your own pace while a tournament ran (2010 → 2026, era-adjusted: shipping on GitHub in 2010 already counted). One per edition. |
+| **Golden Boot** | The top scorer, held on current form — elite Shooting (`SHO` 80+) from a scoring position (`ST`/`RW`/`CAM`). |
+| **World Cup Trophy** | ¡Campeones! Spain won WC26 — a gift carried by every profile whose GitHub location is Spain. |
+
+### The rulebook
+
+Every scout fetches the profile's full history as per-year totals: commits, PRs, reviews, issues and private contributions, for every calendar year since the account was born. Yearly awards are judged on one score per year:
+
+```
+yearScore = 4·log(commits) + 3·log(PRs) + 3·log(reviews) + 2·log(issues) + 2·log(private)
+```
+
+The logs are the anti-spam mechanism. Each signal saturates: 20,000 commits score 17.2, barely ahead of the 13.2 that 2,000 earn. Meanwhile a year of 800 commits, 80 PRs, 80 reviews and 40 issues scores 26. Breadth collects from every term while volume on one axis stalls. There is no balance requirement, though: a commits-only kernel maintainer still scores on the volume terms alone.
+
+Every trophy except the Spanish gift also requires **overall 80+**. That's a floor, not a driver. It keeps thin profiles off the podium and decides nothing else.
+
+#### Ballon d'Or
+
+Judged against your own career, so it needs at least two years of history. A year wins when it clears all three:
+
+1. **2,000+ raw contributions.** No Ballon d'Or on a quiet year, however spiky it looks against the rest.
+2. **Score 16+.** Strong in absolute terms, not just relative ones.
+3. **One of two paths:**
+   - *The spike*: 1.2× your career-median year. One undeniable season in a modest career.
+   - *The elite*: score 19.5+, ratio waived. A sustained-great career has a huge median no single year can tower over, and those years are exactly what the award exists for.
+
+Repeats climb a ladder on the card's overall: **80** holds one, **87** unlocks a second, **94** a third. Icons can take a fourth, and only for a monster year (score 28+). The current year competes while still in progress. It can only under-score, never over-score, so nothing is ever awarded on a projection.
+
+#### WC Golden Ball
+
+One per World Cup edition. For candidates (overall 80+, activity in a WC year) the scout fetches contributions inside each tournament window and judges them era-adjusted, because GitHub in 2010 was a different sport:
+
+| Edition | Window | The bar |
+| :-- | :-- | :-- |
+| South Africa 2010 | Jun 11 – Jul 11 | Presence. Shipping on GitHub at all was the distinction. |
+| Brazil 2014 | Jun 12 – Jul 13 | A handful of contributions. |
+| Russia 2018 | Jun 14 – Jul 15 | A real window, at **1.2×** your usual pace. |
+| Qatar 2022 | Nov 20 – Dec 18 | A strong window (~10 contributions/day), at **1.3×** your usual pace. |
+| North America 2026 | Jun 11 – Jul 19 | A strong window (~10 contributions/day), at **1.3×** your usual pace. |
+
+The pace test compares your daily rate inside the window to your daily rate across that same year. Tournament form means rising above *your own* pace, not an absolute quota. The current year is paced over its elapsed days, not 365, so a routine mid-year can't masquerade as tournament form against a diluted average.
+
+#### Golden Boot
+
+The one trophy held on current form, not kept for life. No year attached, re-judged on every scout: a scoring position (`ST`/`RW`/`CAM`) and Shooting 80+. Star power *is* the shooting stat, so this is the finisher whose repos keep hitting the net. Lose the form, lose the boot.
+
+#### World Cup Trophy
+
+Spain won WC26, and every profile whose GitHub location reads Spain lifts the trophy with them: bronze cards included, no floors, no other conditions. It keys off the country GitHub reports, decided before the flag picker exists, so switching your flag to 🇪🇸 mints nothing.
+
+The whole cabinet is computed server-side at scout time and cached with the card. Duels never award anything. A corner showcases what each card walked in with.
+
+<br/>
+
 <div align="center">
 
 **Built with** Next.js · TypeScript · Tailwind · Redis

@@ -15,7 +15,7 @@ vi.mock("@/lib/redis", () => ({
   },
 }));
 
-import { fetchProfile } from "@/lib/github/client";
+import { fetchProfile, fetchWindows } from "@/lib/github/client";
 import { hashLogin } from "@/lib/github/tokens";
 
 const POOL = ["tokA", "tokB", "tokC", "tokD"];
@@ -251,6 +251,215 @@ describe("fetchProfile request timeout", () => {
     await assertion;
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe("fetchWindows (WC tournament periods)", () => {
+  const W = { totalCommitContributions: 7, totalIssueContributions: 1, totalPullRequestContributions: 2, totalPullRequestReviewContributions: 1, restrictedContributionsCount: 3 };
+  const windows = [
+    { id: "Qatar 2022", from: "2022-11-20T00:00:00Z", to: "2022-12-18T23:59:59Z" },
+    { id: "North America 2026", from: "2026-06-11T00:00:00Z", to: "2026-07-19T23:59:59Z" },
+  ];
+
+  it("fetches all windows in one aliased request, keyed back by id", async () => {
+    scriptFetch((_t, body) =>
+      body.includes("query Windows(") ? ok({ data: { user: { w0: W, w1: W } } }) : okFor(body),
+    );
+    const got = await fetchWindows(LOGIN, windows);
+    expect(calls.filter((c) => c.body.includes("query Windows(")).length).toBe(1);
+    expect(got["Qatar 2022"]).toMatchObject({ commits: 7, prs: 2, reviews: 1, issues: 1, restricted: 3 });
+    expect(got["North America 2026"]).toBeDefined();
+  });
+
+  it("retries windows individually when the pooled request is resource-rejected", async () => {
+    let first = true;
+    scriptFetch((_t, body) => {
+      if (!body.includes("query Windows(")) return okFor(body);
+      if (first) {
+        first = false;
+        return ok({ data: { user: null }, errors: [{ type: "RESOURCE_LIMITS_EXCEEDED", message: "too heavy" }] });
+      }
+      return ok({ data: { user: { w0: W } } });
+    });
+    const got = await fetchWindows(LOGIN, windows);
+    expect(calls.filter((c) => c.body.includes("query Windows(")).length).toBe(3); // 1 pooled + 2 singles
+    expect(Object.keys(got)).toHaveLength(2);
+  });
+});
+
+describe("fetchProfile GraphQL error triage + resource-limit fallback", () => {
+  // Basics = the USER node minus its contributions block, what basicsQuery returns.
+  const BASICS = Object.fromEntries(Object.entries(USER).filter(([k]) => k !== "recent"));
+
+  const resourceError = () =>
+    ok({
+      data: { user: null },
+      errors: [{ type: "RESOURCE_LIMITS_EXCEEDED", message: "Resource limits for this query exceeded." }],
+    });
+
+  // One date-window's worth of contributions. "acme/hot" is below the 3-commit
+  // language threshold in EACH window and only qualifies once windows merge.
+  // Each window covers a distinct date range, so its calendar carries distinct
+  // dates — derived from the from-bound the query inlines, the way GitHub would.
+  const windowDayFrom = (body: string, offset: number) => {
+    const from = body.match(/contributionsCollection\(from: \\"(.*?)\\"/)?.[1] ?? "2026-01-01T00:00:00Z";
+    return new Date(Date.parse(from) + offset * 86_400_000).toISOString().slice(0, 10);
+  };
+
+  const windowRecent = (body: string) => ({
+    totalCommitContributions: 10,
+    totalPullRequestContributions: 20,
+    totalPullRequestReviewContributions: 30,
+    totalIssueContributions: 40,
+    restrictedContributionsCount: 50,
+    commitContributionsByRepository: [
+      {
+        contributions: { totalCount: 2 },
+        repository: { nameWithOwner: "acme/hot", isFork: false, isPrivate: false, primaryLanguage: { name: "Go" } },
+      },
+    ],
+    contributionCalendar: {
+      weeks: [
+        { contributionDays: [{ contributionCount: 1, date: windowDayFrom(body, 0) }, { contributionCount: 0, date: windowDayFrom(body, 1) }] },
+      ],
+    },
+  });
+
+  // Days spanned by a RecentWindow request (from/to are inlined in the query,
+  // which arrives JSON-escaped inside the POST body).
+  const windowDays = (body: string) => {
+    const m = body.match(/contributionsCollection\(from: \\"(.*?)\\", to: \\"(.*?)\\"/);
+    return m ? (Date.parse(m[2]) - Date.parse(m[1])) / 86_400_000 : 0;
+  };
+
+  it("keeps GitHub's real NOT_FOUND on the notfound path", async () => {
+    scriptFetch((_t, body) =>
+      body.includes("query Profile(")
+        ? ok({
+            data: { user: null },
+            errors: [{ type: "NOT_FOUND", message: "Could not resolve to a User with the login of 'nope'." }],
+          })
+        : okFor(body),
+    );
+    await expect(fetchProfile(LOGIN, NOW)).rejects.toMatchObject({ type: "notfound" });
+  });
+
+  it("surfaces other GraphQL errors as network failures, never as notfound", async () => {
+    scriptFetch((_t, body) =>
+      body.includes("query Profile(")
+        ? ok({ data: { user: null }, errors: [{ type: "SOMETHING_ELSE", message: "field failed" }] })
+        : okFor(body),
+    );
+    await expect(fetchProfile(LOGIN, NOW)).rejects.toMatchObject({ type: "network", message: "field failed" });
+  });
+
+  it("keeps a usable user node when field-level errors ride along (partial success)", async () => {
+    scriptFetch((_t, body) =>
+      body.includes("query Profile(")
+        ? ok({ data: { user: USER }, errors: [{ type: "FORBIDDEN", message: "SAML enforced." }] })
+        : okFor(body),
+    );
+    await expect(fetchProfile(LOGIN, NOW)).resolves.toMatchObject({ login: LOGIN });
+  });
+
+  it("rebuilds a resource-limited profile from basics + two half-year windows", async () => {
+    scriptFetch((_t, body) => {
+      if (body.includes("query Profile(")) return resourceError();
+      if (body.includes("query Basics(")) return ok({ data: { user: BASICS } });
+      if (body.includes("query RecentWindow(")) return ok({ data: { user: { recent: windowRecent(body) } } });
+      return ok({ data: { user: {} } }); // lifetime — contributes 0 here
+    });
+
+    const payload = await fetchProfile(LOGIN, NOW);
+    const windowCalls = calls.filter((c) => c.body.includes("query RecentWindow(")).length;
+
+    expect(windowCalls).toBe(2);
+    expect(calls.filter((c) => c.body.includes("query Basics(")).length).toBe(1);
+    // Disjoint windows sum: totals add, calendars concatenate.
+    expect(payload).toMatchObject({
+      login: LOGIN,
+      recentCommits: 20,
+      recentPRs: 40,
+      recentReviews: 60,
+      recentIssues: 80,
+      recentRestricted: 100,
+      recentActiveDays: 2,
+    });
+    // Per-repo commit counts merge BEFORE the ≥3 threshold: 2 + 2 commits to
+    // acme/hot only qualifies as a language because the windows were combined.
+    expect(payload.languageRepos).toContainEqual({ language: "Go" });
+  });
+
+  it("splits a window that is itself over budget and sums the quarters", async () => {
+    scriptFetch((_t, body) => {
+      if (body.includes("query Profile(")) return resourceError();
+      if (body.includes("query Basics(")) return ok({ data: { user: BASICS } });
+      if (body.includes("query RecentWindow(")) {
+        // Half-year windows (>120d) still blow the budget; quarters pass.
+        if (windowDays(body) > 120) return resourceError();
+        return ok({ data: { user: { recent: windowRecent(body) } } });
+      }
+      return ok({ data: { user: {} } });
+    });
+
+    const payload = await fetchProfile(LOGIN, NOW);
+    const windowCalls = calls.filter((c) => c.body.includes("query RecentWindow(")).length;
+
+    expect(windowCalls).toBe(6); // 2 rejected halves + 4 quarters
+    expect(payload.recentPRs).toBe(20 * 4);
+    expect(payload.recentActiveDays).toBe(4);
+  });
+
+  it("degrades a still-over-budget floor window to zeros instead of failing the scout", async () => {
+    scriptFetch((_t, body) => {
+      if (body.includes("query Profile(")) return resourceError();
+      if (body.includes("query Basics(")) return ok({ data: { user: BASICS } });
+      if (body.includes("query RecentWindow(")) return resourceError(); // every window, every depth
+      return ok({ data: { user: {} } });
+    });
+
+    const payload = await fetchProfile(LOGIN, NOW);
+    // Split ladder exhausted: 2 halves + 4 quarters + 8 eighths, all rejected.
+    expect(calls.filter((c) => c.body.includes("query RecentWindow(")).length).toBe(14);
+    // The card still exists — profile basics intact, contributions zeroed.
+    expect(payload).toMatchObject({ login: LOGIN, recentPRs: 0, recentActiveDays: 0 });
+  });
+
+  it("stays notfound when the basics query says the user is gone mid-fallback", async () => {
+    scriptFetch((_t, body) => {
+      if (body.includes("query Profile(")) return resourceError();
+      if (body.includes("query Basics(")) return ok({ data: { user: null } });
+      return okFor(body);
+    });
+    await expect(fetchProfile(LOGIN, NOW)).rejects.toMatchObject({ type: "notfound" });
+  });
+
+  it("retries a resource-limited lifetime batch year by year", async () => {
+    const YEAR = {
+      totalCommitContributions: 5,
+      totalIssueContributions: 1,
+      totalPullRequestContributions: 2,
+      totalPullRequestReviewContributions: 1,
+      restrictedContributionsCount: 1,
+    };
+    scriptFetch((_t, body) => {
+      if (body.includes("query Profile(")) return ok({ data: { user: USER } });
+      if (body.includes("query Lifetime(")) {
+        // The 4-year aliased batch pools its cost and dies; single years pass.
+        const aliases = (body.match(/y\d{4}:/g) ?? []).length;
+        if (aliases > 1) return resourceError();
+        return ok({ data: { user: { [`y${body.match(/y(\d{4}):/)![1]}`]: YEAR } } });
+      }
+      return okFor(body);
+    });
+
+    const payload = await fetchProfile(LOGIN, NOW);
+    // createdAt 2023 -> years 2023..2026: 1 failed batch + 4 single-year retries.
+    expect(calls.filter((c) => c.body.includes("query Lifetime(")).length).toBe(5);
+    expect(payload.lifetimeContributions).toBe(10 * 4);
+    // The per-year breakdown behind it survives the retry, oldest first.
+    expect(payload.years.map((y) => y.year)).toEqual([2023, 2024, 2025, 2026]);
+    expect(payload.years[0]).toMatchObject({ commits: 5, prs: 2, reviews: 1, issues: 1, restricted: 1 });
   });
 });
 

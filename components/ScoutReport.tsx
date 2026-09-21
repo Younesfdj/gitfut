@@ -220,7 +220,7 @@ function Stagger({ step, children, className }: { step: number; children: React.
 // verdict-at-a-glance) anchors the row, top-aligned with the name; the
 // identity block sits beside it. No centered stack, no floating pill, no
 // decorative flanking rules.
-export function ReportHeader({ card }: { card: Card }) {
+export function ReportHeader({ card, still = false }: { card: Card; still?: boolean }) {
   const theme = resolveResultTheme(card);
   const accent = theme.ink;
   return (
@@ -252,20 +252,32 @@ export function ReportHeader({ card }: { card: Card }) {
         <Stagger step={1} className="relative">
           <div
             aria-hidden
-            className="animate-glow pointer-events-none absolute -left-[6%] top-1/2 -z-10 h-[160%] w-[70%] -translate-y-1/2 rounded-full blur-[42px]"
+            className={`pointer-events-none absolute -left-[6%] top-1/2 -z-10 h-[160%] w-[70%] -translate-y-1/2 rounded-full blur-[42px] ${still ? "opacity-70" : "animate-glow"}`}
             style={{ background: `radial-gradient(closest-side, ${theme.glow}, transparent 72%)` }}
           />
+          {/* The name paints through a text mask (background-clip) under a
+              drop-shadow, which puts it in its own composited layer. Inside the
+              tour's stage that layer has to be re-rasterized at every scale the
+              camera passes through, and each re-raster lands a frame late, so
+              the name pops. `still` paints it flat — the replica is only a
+              backdrop for a camera move, nothing in it needs to shimmer. */}
           <h2
-            className="font-display truncate text-[clamp(32px,5.4vw,56px)] font-black leading-[.92]"
-            style={{
-              backgroundImage: `linear-gradient(100deg, #e6edf3 0%, #e6edf3 38%, ${accent} 50%, #fff 54%, #e6edf3 64%, #e6edf3 100%)`,
-              backgroundSize: "220% 100%",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-              filter: `drop-shadow(0 2px 14px ${accent}38)`,
-              animation: "gf-name-shimmer 4.5s ease-in-out 0.6s both",
-            }}
+            className={`font-display truncate text-[clamp(32px,5.4vw,56px)] font-black leading-[.92]${
+              still ? " text-ink" : ""
+            }`}
+            style={
+              still
+                ? undefined
+                : {
+                    backgroundImage: `linear-gradient(100deg, #e6edf3 0%, #e6edf3 38%, ${accent} 50%, #fff 54%, #e6edf3 64%, #e6edf3 100%)`,
+                    backgroundSize: "220% 100%",
+                    WebkitBackgroundClip: "text",
+                    backgroundClip: "text",
+                    color: "transparent",
+                    filter: `drop-shadow(0 2px 14px ${accent}38)`,
+                    animation: "gf-name-shimmer 4.5s ease-in-out 0.6s both",
+                  }
+            }
           >
             {card.name}
           </h2>

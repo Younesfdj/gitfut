@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 // Last-resort boundary: a throw in the root layout itself escapes app/error.tsx,
 // so this replaces the entire document (it must render its own <html>/<body>).
@@ -16,6 +17,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("[gitfut] global error:", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

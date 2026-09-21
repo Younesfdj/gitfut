@@ -103,10 +103,9 @@ export function countryFromLocation(location: string | null | undefined): string
   return null;
 }
 
-// Pinned origin countries for the showcased accounts — their birthplace, not the
-// city in their GitHub "location" (Torvalds lists Portland, but he's Finnish).
+// Pinned origin countries for the showcased accounts 
 const PINNED: Record<string, string> = {
-  torvalds: "us", // Linus Torvalds — Finland
+  torvalds: "us", // Linus Torvalds — USA
   theprimeagen: "us", // Michael Paulson — USA
   "pewdiepie-archdaemon": "se",
   t3dotgg: "us", // Theo Browne — USA

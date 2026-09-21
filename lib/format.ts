@@ -9,8 +9,8 @@ export const formatCount = (n: number): string => {
   if (n >= 1_000_000) return compact(n, 1_000_000, "M");
   if (n >= 1000) {
     const thousands = compact(n, 1000, "k");
-    // 999_950+ rounds up to "1000k"; roll over to the next unit rather than
-    // printing a four-digit thousands value.
+    // 999_500+ rounds up to "1000k" (toFixed(0) rounds half-up at 999.5); roll
+    // over to the next unit rather than printing a four-digit thousands value.
     return thousands === "1000k" ? compact(n, 1_000_000, "M") : thousands;
   }
   return String(Math.round(n));

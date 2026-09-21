@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Bebas_Neue, Inter, JetBrains_Mono } from "next/font/google";
 import localFont from "next/font/local";
+import Script from "next/script";
 import "./globals.css";
-import { Analytics } from "@vercel/analytics/next";
+import BallCursor from "@/components/BallCursor";
 
 // Display — ultra-condensed all-caps for the WC26 "tournament" impact.
 const display = Bebas_Neue({
@@ -74,8 +75,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${display.variable} ${sans.variable} ${mono.variable} ${dinCond.variable} ${dinBold.variable} ${dinMedium.variable} antialiased`}
     >
       <body>
+        <BallCursor />
         {children}
-        <Analytics />
+        <Script
+          defer
+          src="https://umami.gitfut.com/script.js"
+          data-website-id="027b8f90-8ef1-4033-884a-864d6c9036e4"
+        />
       </body>
     </html>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Link2, Repeat, Share2 } from "lucide-react";
 import { dominanceShare, tallyRows, type Duel, type DuelSide } from "@/lib/duel";
@@ -20,6 +21,9 @@ import { useShareActions } from "@/hooks/useShareActions";
 import { resolvedRows } from "@/lib/reveal";
 import { formatCount } from "@/lib/format";
 import { duelIntentUrl, duelSharePayload, duelUrl } from "@/lib/share";
+import { AWARD_META, groupAwards, type AwardGroup } from "@/lib/awards";
+import AwardModal from "./AwardModal";
+import TrophySprite, { AWARD_SPRITES } from "./TrophySprite";
 
 const CARD_WIDTH = "clamp(150px, min(24vw, 34vh), 292px)";
 
@@ -152,6 +156,8 @@ export default function DuelView({
   stars: number | null;
 }) {
   const { challenger, opponent, rows, winner, onPenalties, training } = duel;
+
+  const [activeAward, setActiveAward] = useState<AwardGroup | null>(null);
   // Kit clash (see finishTheme): ONLY a toty/totw vs silver pairing recolors —
   // the toty side wears its saturated tier blue so the sides stay readable.
   const { home: aTheme, away: bTheme } = duelThemes(challenger, opponent);
@@ -205,6 +211,9 @@ export default function DuelView({
   const corner = (card: Card, theme: { ink: string }, side: DuelSide) => {
     const won = focus === side;
     const lost = focus !== null && !won;
+    // Showcase, not prize: a corner flexes the cabinet this card walked in with
+    // (computed at scout time). The duel itself never awards trophies.
+    const cabinet = groupAwards(card.awards);
     return (
       <div
         className={`flex flex-col items-center gap-[10px] ${
@@ -218,6 +227,45 @@ export default function DuelView({
           transition: "opacity .7s ease, filter .7s ease",
         }}
       >
+        {/* Trophy cabinet — each corner flexes the awards it brought in */}
+        {settled && cabinet.length > 0 && (
+          <section
+            className="rounded-2xl border border-white/[0.06] bg-[#0b0930]/35 backdrop-blur-sm p-[12px_8px] flex flex-col gap-1.5 mb-[12px] animate-rise-soft shadow-[0_8px_20px_rgba(0,0,0,0.3)]"
+            style={{ width: CARD_WIDTH }}
+          >
+            <div className="flex items-center gap-[6px] justify-start text-left px-1">
+              <span className="h-[2px] w-[10px] rounded-full bg-brand" />
+              <h3 className="font-display text-[8.5px] font-bold tracking-[.25em] text-ink-mute uppercase">ACHIEVED AWARDS</h3>
+            </div>
+            <div className="flex justify-evenly mt-1 items-center gap-1">
+              {cabinet.map((group) => (
+                <button
+                  key={group.key}
+                  type="button"
+                  onClick={() => setActiveAward(group)}
+                  aria-label={`${AWARD_META[group.key].title} details`}
+                  className="relative flex flex-col items-center cursor-pointer group"
+                >
+                  <div className="group-hover:scale-110 active:scale-95 transition-transform duration-200">
+                    <TrophySprite
+                      sprite={AWARD_SPRITES[group.key].sprite}
+                      size={68}
+                      className={AWARD_SPRITES[group.key].tint}
+                    />
+                  </div>
+                  {group.instances.length > 1 && (
+                    <span className="font-display absolute right-[2px] top-[2px] text-[15px] font-semibold text-gold">
+                      ×{group.instances.length}
+                    </span>
+                  )}
+                  <span className="text-[7.5px] font-mono font-bold text-ink-mute tracking-wider mt-0.5 group-hover:text-gold transition-colors">
+                    {AWARD_META[group.key].shelfLabel}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
         <div
           style={{
             width: CARD_WIDTH,
@@ -674,6 +722,14 @@ export default function DuelView({
 
       <SupportProductHunt />
       <BuyMeACoffee />
+
+      {activeAward && (
+        <AwardModal
+          awardKey={activeAward.key}
+          instances={activeAward.instances}
+          onClose={() => setActiveAward(null)}
+        />
+      )}
     </>
   );
 }

@@ -11,6 +11,7 @@ import BuyMeACoffee from "@/components/BuyMeACoffee";
 import SupportProductHunt from "@/components/SupportProductHunt";
 import GithubStar from "@/components/GithubStar";
 import { SAMPLE_CARDS } from "@/lib/github/samples";
+import { TOUR_STORAGE_KEY } from "@/components/tour/steps";
 
 const HowItWorksModal = dynamic(() => import("@/components/HowItWorksModal"), {
   ssr: false,
@@ -18,6 +19,11 @@ const HowItWorksModal = dynamic(() => import("@/components/HowItWorksModal"), {
 // Home-only: AppShell is rendered solely by app/page.tsx, so the TEAM NEWS
 // bulletin never mounts on scout/duel pages. Lazy + ssr:false like the modal.
 const WhatsNew = dynamic(() => import("@/components/WhatsNew"), { ssr: false });
+// First-visit what's-new tour (thank-you + zoom showcase). Mounted over home as
+// a pure overlay — no navigation in or out — and only until it has been seen
+// once (localStorage; the pre-hydration cover in app/page.tsx hides home's
+// first paint for exactly the visitors who will get it).
+const FeatureTour = dynamic(() => import("@/components/tour/FeatureTour"), { ssr: false });
 
 export default function AppShell({
   stars,
@@ -30,6 +36,7 @@ export default function AppShell({
   const [isPending, startTransition] = useTransition();
   const [pending, setPending] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
 
   // Mark this tab as "has visited home" so a scouted card shows BACK, while a
   // directly-opened / shared card link (no home visit) shows a "make your card"
@@ -38,6 +45,21 @@ export default function AppShell({
     try {
       sessionStorage.setItem("gitfut:seen-home", "1");
     } catch {}
+  }, []);
+
+  // The tour auto-plays exactly once. Mounted immediately even though it stays
+  // invisible at first: its demo stage is a whole scout page, and rendering
+  // that behind a transparent overlay is what lets the reveal be a clean fade
+  // instead of a mount. The hold on home is the tour's own (see FeatureTour).
+  // Deferred set (like seen-home above) so it can't cascade a render.
+  useEffect(() => {
+    let show = false;
+    try {
+      show = !localStorage.getItem(TOUR_STORAGE_KEY);
+    } catch {}
+    if (!show) return;
+    const t = setTimeout(() => setTourOpen(true), 0);
+    return () => clearTimeout(t);
   }, []);
 
   // Scouting navigates to the canonical /<username> route. The transition keeps
@@ -80,6 +102,8 @@ export default function AppShell({
 
       {modalOpen && <HowItWorksModal onClose={() => setModalOpen(false)} />}
       <WhatsNew />
+
+      {tourOpen && <FeatureTour onDone={() => setTourOpen(false)} />}
     </>
   );
 }
