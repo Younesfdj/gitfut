@@ -33,6 +33,7 @@ const payload = (over: Partial<RawPayload> = {}): RawPayload => ({
   recentActiveDays: 0,
   lifetimeContributions: 0,
   years: [],
+  contributionDays: [],
   ...over,
 });
 

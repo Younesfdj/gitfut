@@ -169,6 +169,38 @@ describe("fetchProfile token pool", () => {
   });
 });
 
+describe("fetchProfile contribution calendar", () => {
+  const USER_CALENDAR = {
+    ...USER,
+    recent: {
+      ...USER.recent,
+      contributionCalendar: {
+        weeks: [
+          { contributionDays: [{ contributionCount: 0, date: "2026-06-29" }, { contributionCount: 3, date: "2026-06-30" }] },
+          { contributionDays: [{ contributionCount: 0, date: "2026-07-01" }] },
+        ],
+      },
+    },
+  };
+
+  it("requests each day's date alongside its count", async () => {
+    scriptFetch((_t, body) => okFor(body));
+    await fetchProfile(LOGIN, NOW);
+    expect(calls[0].body).toContain("contributionDays { contributionCount date }");
+  });
+
+  it("flattens the calendar into contributionDays and derives recentActiveDays from it", async () => {
+    scriptFetch((_t, body) => (body.includes("query Profile") ? ok({ data: { user: USER_CALENDAR } }) : ok({ data: { user: {} } })));
+    const payload = await fetchProfile(LOGIN, NOW);
+    expect(payload.contributionDays).toEqual([
+      { date: "2026-06-29", count: 0 },
+      { date: "2026-06-30", count: 3 },
+      { date: "2026-07-01", count: 0 },
+    ]);
+    expect(payload.recentActiveDays).toBe(1);
+  });
+});
+
 describe("fetchProfile username validation", () => {
   it("accepts legacy usernames with a trailing hyphen (real GitHub accounts)", async () => {
     scriptFetch((_t, body) => okFor(body));
@@ -267,7 +299,14 @@ describe("fetchProfile GraphQL error triage + resource-limit fallback", () => {
 
   // One date-window's worth of contributions. "acme/hot" is below the 3-commit
   // language threshold in EACH window and only qualifies once windows merge.
-  const windowRecent = () => ({
+  // Each window covers a distinct date range, so its calendar carries distinct
+  // dates — derived from the from-bound the query inlines, the way GitHub would.
+  const windowDayFrom = (body: string, offset: number) => {
+    const from = body.match(/contributionsCollection\(from: \\"(.*?)\\"/)?.[1] ?? "2026-01-01T00:00:00Z";
+    return new Date(Date.parse(from) + offset * 86_400_000).toISOString().slice(0, 10);
+  };
+
+  const windowRecent = (body: string) => ({
     totalCommitContributions: 10,
     totalPullRequestContributions: 20,
     totalPullRequestReviewContributions: 30,
@@ -279,7 +318,11 @@ describe("fetchProfile GraphQL error triage + resource-limit fallback", () => {
         repository: { nameWithOwner: "acme/hot", isFork: false, isPrivate: false, primaryLanguage: { name: "Go" } },
       },
     ],
-    contributionCalendar: { weeks: [{ contributionDays: [{ contributionCount: 1 }, { contributionCount: 0 }] }] },
+    contributionCalendar: {
+      weeks: [
+        { contributionDays: [{ contributionCount: 1, date: windowDayFrom(body, 0) }, { contributionCount: 0, date: windowDayFrom(body, 1) }] },
+      ],
+    },
   });
 
   // Days spanned by a RecentWindow request (from/to are inlined in the query,
@@ -323,7 +366,7 @@ describe("fetchProfile GraphQL error triage + resource-limit fallback", () => {
     scriptFetch((_t, body) => {
       if (body.includes("query Profile(")) return resourceError();
       if (body.includes("query Basics(")) return ok({ data: { user: BASICS } });
-      if (body.includes("query RecentWindow(")) return ok({ data: { user: { recent: windowRecent() } } });
+      if (body.includes("query RecentWindow(")) return ok({ data: { user: { recent: windowRecent(body) } } });
       return ok({ data: { user: {} } }); // lifetime — contributes 0 here
     });
 
@@ -354,7 +397,7 @@ describe("fetchProfile GraphQL error triage + resource-limit fallback", () => {
       if (body.includes("query RecentWindow(")) {
         // Half-year windows (>120d) still blow the budget; quarters pass.
         if (windowDays(body) > 120) return resourceError();
-        return ok({ data: { user: { recent: windowRecent() } } });
+        return ok({ data: { user: { recent: windowRecent(body) } } });
       }
       return ok({ data: { user: {} } });
     });

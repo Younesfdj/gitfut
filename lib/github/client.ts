@@ -55,6 +55,14 @@ export interface RawRepoLanguage {
   language: string | null;
 }
 
+// One day of the real per-user contribution calendar — the row shape behind
+// RawPayload.contributionDays below, and the input to lib/contributions.ts's
+// calendar -> panel transform.
+export interface ContributionDay {
+  date: string; // "YYYY-MM-DD", the UTC calendar date GitHub reports
+  count: number;
+}
+
 // Flat, normalized profile — all fields below are real GitHub data.
 export interface RawPayload {
   login: string;
@@ -74,6 +82,7 @@ export interface RawPayload {
   recentActiveDays: number;
   lifetimeContributions: number; // all years, all types, incl. private
   years: YearBreakdown[]; // per-year breakdown behind it, oldest first (failed years omitted)
+  contributionDays: ContributionDay[]; // the full calendar recentActiveDays is reduced from — real per-day counts, for the profile's contribution graph
 }
 
 const ENDPOINT = "https://api.github.com/graphql";
@@ -137,7 +146,7 @@ interface UserNode {
       };
     }[];
     contributionCalendar: {
-      weeks: { contributionDays: { contributionCount: number }[] }[];
+      weeks: { contributionDays: { contributionCount: number; date: string }[] }[];
     };
   };
 }
@@ -266,7 +275,7 @@ function profileQuery(): string {
             contributions { totalCount }
             repository { nameWithOwner isFork isPrivate primaryLanguage { name } }
           }
-          contributionCalendar { weeks { contributionDays { contributionCount } } }
+          contributionCalendar { weeks { contributionDays { contributionCount date } } }
         }
       }
     }`;
@@ -319,7 +328,7 @@ function recentWindowQuery(fromIso: string, toIso: string): string {
             contributions { totalCount }
             repository { nameWithOwner isFork isPrivate primaryLanguage { name } }
           }
-          contributionCalendar { weeks { contributionDays { contributionCount } } }
+          contributionCalendar { weeks { contributionDays { contributionCount date } } }
         }
       }
     }`;
@@ -650,10 +659,15 @@ function normalize(user: UserNode, years: YearBreakdown[]): RawPayload {
   }
   const languageRepos: RawRepoLanguage[] = [...languageByRepo.values()].map((language) => ({ language }));
 
-  const recentActiveDays = user.recent.contributionCalendar.weeks.reduce(
-    (days, w) => days + w.contributionDays.filter((d) => d.contributionCount > 0).length,
-    0,
-  );
+  // Summed by date, not just flattened: the windowed fallback (fetchProfileWindowed)
+  // concatenates two calendars, so a boundary day shows up twice — once with its
+  // count, once as a zero. Folding keeps one row per day for the contribution graph.
+  const dayCounts = new Map<string, number>();
+  for (const w of user.recent.contributionCalendar.weeks)
+    for (const d of w.contributionDays)
+      dayCounts.set(d.date, (dayCounts.get(d.date) ?? 0) + d.contributionCount);
+  const contributionDays: ContributionDay[] = [...dayCounts].map(([date, count]) => ({ date, count }));
+  const recentActiveDays = contributionDays.filter((d) => d.count > 0).length;
 
   return {
     login: user.login,
@@ -673,5 +687,6 @@ function normalize(user: UserNode, years: YearBreakdown[]): RawPayload {
     recentActiveDays,
     lifetimeContributions,
     years,
+    contributionDays,
   };
 }

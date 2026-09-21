@@ -243,6 +243,7 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
     recentActiveDays,
     lifetimeContributions,
     years: [], // per-year breakdown feeds awards, not scoring — the runner only scores
+    contributionDays: [], // unused by scoring; this script only feeds the distribution histogram
   };
 }
 

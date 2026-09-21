@@ -11,6 +11,15 @@ function resolveCountry(card: Card, override: string | null): Card {
   return { ...card, country: pickFlag(override, card.country) ?? "" };
 }
 
+// The full daily calendar only exists to feed the result page's contribution
+// graph — this JSON API has no other reason to carry ~365 extra rows per
+// response, so it's dropped here rather than riding along on every Card.
+function omitContributionDays(card: Card): Omit<Card, "contributionDays"> {
+  const rest = { ...card };
+  delete rest.contributionDays;
+  return rest;
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   const override = new URL(req.url).searchParams.get("country");
@@ -19,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ username
   try {
     const card = await scoutCard(username);
     after(() => recordScout());
-    return Response.json(resolveCountry(card, override));
+    return Response.json(omitContributionDays(resolveCountry(card, override)));
   } catch (e) {
     const err = e as GithubError;
     const status =
