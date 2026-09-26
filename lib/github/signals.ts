@@ -21,14 +21,11 @@ export function signalsFromPayload(p: RawPayload, now = Date.now()): Signals {
   // styling/markup (CSS/HTML) — the #1 drives the card's language + logo.
   const rankedLanguages = rankLanguages(p.languageRepos);
 
-  const years = new Set<number>();
-  for (const r of p.repos) {
-    const c = yearOf(r.createdAt);
-    const pushed = yearOf(r.pushedAt);
-    if (c) years.add(c);
-    if (pushed) years.add(pushed);
-  }
-  const active_years = Math.min(Math.max(years.size, 1), Math.ceil(account_age_years) || 1);
+  // GitHub's annual contributionsCollection is the source of truth for active
+  // years. Repository creation/push dates only cover repos the user owns and
+  // therefore miss organization-owned, private, and contribution-only activity.
+  // A failed/missing year remains absent rather than being fabricated as active.
+  const active_years = p.years?.length ?? 0;
 
   // Recent activity over the last year: every contribution type GitHub exposes,
   // including the private (restricted) count, so it matches the profile graph.

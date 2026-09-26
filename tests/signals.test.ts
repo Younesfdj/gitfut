@@ -87,3 +87,34 @@ describe("signalsFromPayload — language diversity", () => {
     expect(s.topLanguage).toBeNull();
   });
 });
+
+
+describe("signalsFromPayload — active years", () => {
+  it("counts active years from annual contribution windows, including organization-only years", () => {
+    const s = signalsFromPayload(
+      payload({
+        repos: [repo({ createdAt: "2025-06-01T00:00:00Z", pushedAt: "2025-06-01T00:00:00Z" })],
+        years: [
+          { year: 2021, commits: 4, prs: 0, reviews: 0, issues: 0, restricted: 0 },
+          { year: 2023, commits: 2, prs: 1, reviews: 0, issues: 0, restricted: 0 },
+          { year: 2026, commits: 1, prs: 0, reviews: 0, issues: 0, restricted: 0 },
+        ],
+      }),
+      NOW,
+    );
+    expect(s.active_years).toBe(3);
+  });
+
+  it("does not invent an active year when an annual contribution window is missing", () => {
+    const s = signalsFromPayload(
+      payload({ years: [{ year: 2026, commits: 0, prs: 0, reviews: 0, issues: 0, restricted: 0 }] }),
+      NOW,
+    );
+    expect(s.active_years).toBe(1);
+  });
+
+  it("reports zero active years when all annual windows are unavailable", () => {
+    const s = signalsFromPayload(payload({ years: [] }), NOW);
+    expect(s.active_years).toBe(0);
+  });
+});
