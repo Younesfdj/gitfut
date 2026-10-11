@@ -164,6 +164,36 @@ describe("headline demotion, extended", () => {
   });
 });
 
+describe("Verilog / SystemVerilog (develop-only Devicon icons)", () => {
+  it("maps both GitHub language names to their Devicon ids", () => {
+    expect(logoSlugFor("Verilog")).toBe("verilog-original");
+    expect(logoSlugFor("SystemVerilog")).toBe("systemverilog-original");
+  });
+
+  it("headlines each language's own logo, with no fall-through to the other", () => {
+    expect(topLanguageLogo(["Verilog", "C"])).toEqual({ name: "Verilog", slug: "verilog-original" });
+    expect(topLanguageLogo(["SystemVerilog", "Verilog"])).toEqual({
+      name: "SystemVerilog",
+      slug: "systemverilog-original",
+    });
+  });
+
+  it("ranks above styling languages like any real language", () => {
+    expect(rankLanguages(repos("CSS", "CSS", "SystemVerilog"))).toEqual(["SystemVerilog", "CSS"]);
+  });
+
+  // The default CDN_BASE resolves to the latest Devicon release, which doesn't have these
+  // icons yet, so they must come from the develop branch until a release ships them.
+  it("serves develop-only icons from Devicon's develop branch", () => {
+    expect(languageLogoUrl("verilog-original")).toBe(
+      "https://cdn.jsdelivr.net/gh/devicons/devicon@develop/icons/verilog/verilog-original.svg",
+    );
+    expect(languageLogoUrl("systemverilog-original")).toBe(
+      "https://cdn.jsdelivr.net/gh/devicons/devicon@develop/icons/systemverilog/systemverilog-original.svg",
+    );
+  });
+});
+
 describe("ReScript (Devicon lacks it — overridden to Material Icon Theme)", () => {
   it("resolves the slug and headlines its own logo", () => {
     expect(logoSlugFor("ReScript")).toBe("rescript");

@@ -16,16 +16,27 @@
 
 const CDN_BASE = "https://cdn.jsdelivr.net/gh/devicons/devicon/icons";
 
-// Per-language logo overrides, for two cases: (1) Devicon draws it in a style that
+// Devicon's `develop` branch, for icons that are merged upstream but not in a tagged
+// release yet. CDN_BASE has no version, so it resolves to the latest release and
+// would 404 for those. To show such an icon now, point its LOGO_URL_OVERRIDES entry
+// at this base. Delete the entry once a release ships the icon; the default
+// CDN_BASE path then takes over.
+const DEVICON_DEVELOP = "https://cdn.jsdelivr.net/gh/devicons/devicon@develop/icons";
+
+// Per-language logo overrides, for three cases: (1) Devicon draws it in a style that
 // clashes with the card art — notably C, whose `c-original` is a beveled teal badge
-// that reads as a muddy blob over the player photo; and (2) Devicon has no icon at
-// all — like ReScript. Keyed by our slug → full logo URL on any CDN that serves a
-// clean, full-colour, transparent asset. Add a language here when Devicon's icon
-// looks bad or is missing.
+// that reads as a muddy blob over the player photo; (2) Devicon has no icon at
+// all — like ReScript; and (3) the icon is merged to Devicon's develop branch but
+// not released yet (see DEVICON_DEVELOP). Keyed by our slug → full logo URL on any
+// CDN that serves a clean, full-colour, transparent asset. Add a language here when
+// Devicon's icon looks bad or is missing.
 const LOGO_URL_OVERRIDES: Record<string, string> = {
   "c-original": "https://cdn.jsdelivr.net/npm/programming-languages-logos/src/c/c.png",
   // Devicon has no ReScript icon; use Material Icon Theme's (the coral ReScript mark).
   rescript: "https://cdn.jsdelivr.net/gh/PKief/vscode-material-icon-theme/icons/rescript.svg",
+  // Develop-only Devicon icons (see DEVICON_DEVELOP). Remove each entry once Devicon releases it.
+  "verilog-original": `${DEVICON_DEVELOP}/verilog/verilog-original.svg`,
+  "systemverilog-original": `${DEVICON_DEVELOP}/systemverilog/systemverilog-original.svg`,
 };
 
 // GitHub primaryLanguage.name (lowercased) → Devicon icon id ("<dir>-<variant>").
@@ -73,6 +84,8 @@ export const LANGUAGE_SLUGS: Record<string, string> = {
   solidity: "solidity-original",
   nim: "nim-original",
   rescript: "rescript", // override-only (Devicon lacks it) — see LOGO_URL_OVERRIDES
+  verilog: "verilog-original", // develop-only for now, see DEVICON_DEVELOP
+  systemverilog: "systemverilog-original", // develop-only for now
 
   // Where a language's canonical mark IS its tool, we use the tool's icon: Emacs
   // Lisp → Emacs, Vim Script → Vim, GDScript → Godot, HCL → Terraform, PL/pgSQL
