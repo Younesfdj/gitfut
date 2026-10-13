@@ -72,6 +72,7 @@ export interface RawPayload {
   recentIssues: number;
   recentRestricted: number; // last-year private contributions (count only)
   recentActiveDays: number;
+  recentDaily: number[]; // last-year contribution calendar, one count per day, oldest first
   lifetimeContributions: number; // all years, all types, incl. private
   years: YearBreakdown[]; // per-year breakdown behind it, oldest first (failed years omitted)
 }
@@ -654,6 +655,9 @@ function normalize(user: UserNode, years: YearBreakdown[]): RawPayload {
     (days, w) => days + w.contributionDays.filter((d) => d.contributionCount > 0).length,
     0,
   );
+  const recentDaily = user.recent.contributionCalendar.weeks.flatMap((w) =>
+    w.contributionDays.map((d) => d.contributionCount),
+  );
 
   return {
     login: user.login,
@@ -671,6 +675,7 @@ function normalize(user: UserNode, years: YearBreakdown[]): RawPayload {
     recentIssues: user.recent.totalIssueContributions,
     recentRestricted: user.recent.restrictedContributionsCount,
     recentActiveDays,
+    recentDaily,
     lifetimeContributions,
     years,
   };

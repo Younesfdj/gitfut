@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { signalsFromPayload } from "@/lib/github/signals";
+import { isRecentSpike, signalsFromPayload } from "@/lib/github/signals";
 import type { RawPayload, RawRepo } from "@/lib/github/client";
 
 // The language signal is scored over `languageRepos` (owned ∪ recently-contributed
@@ -31,6 +31,7 @@ const payload = (over: Partial<RawPayload> = {}): RawPayload => ({
   recentIssues: 0,
   recentRestricted: 0,
   recentActiveDays: 0,
+  recentDaily: [],
   lifetimeContributions: 0,
   years: [],
   ...over,
@@ -85,5 +86,41 @@ describe("signalsFromPayload — language diversity", () => {
     expect(s.languages).toBe(0);
     expect(s.rankedLanguages).toEqual([]);
     expect(s.topLanguage).toBeNull();
+  });
+});
+
+describe("isRecentSpike — the Explosive style", () => {
+  const daily = (before: number, last90: number) => [
+    ...Array<number>(275).fill(before),
+    ...Array<number>(90).fill(last90),
+  ];
+  const year = (y: number, commits: number) => ({ year: y, commits, prs: 0, reviews: 0, issues: 0, restricted: 0 });
+
+  it("fires on a fresh burst that a whole-year total would smother", () => {
+    // ~1/day for the last 90 days vs a usual ~0.3/day (the lifetime rate beats the quiet year's 0.1).
+    const d = [...Array<number>(275).fill(0).map((_, i) => (i % 10 === 0 ? 1 : 0)), ...Array<number>(90).fill(1)];
+    expect(isRecentSpike(d, [year(2024, 110), year(2025, 120)], NOW)).toBe(true);
+  });
+
+  it("does NOT fire on a burst that ended months ago", () => {
+    expect(isRecentSpike(daily(3, 0), [], NOW)).toBe(false);
+  });
+
+  it("does NOT fire for a steady pace", () => {
+    expect(isRecentSpike(daily(2, 2), [], NOW)).toBe(false);
+  });
+
+  it("does NOT treat a return to the lifetime pace as a burst", () => {
+    expect(isRecentSpike(daily(0, 1), [year(2023, 365), year(2024, 365)], NOW)).toBe(false);
+  });
+
+  it("ignores tiny counts after a quiet spell", () => {
+    const d = [...Array<number>(355).fill(0), ...Array<number>(10).fill(2)]; // 20 total
+    expect(isRecentSpike(d, [], NOW)).toBe(false);
+  });
+
+  it("wires through signalsFromPayload", () => {
+    expect(signalsFromPayload(payload({ recentDaily: daily(0, 1) }), NOW).recent_spike).toBe(true);
+    expect(signalsFromPayload(payload({ recentDaily: daily(1, 0) }), NOW).recent_spike).toBe(false);
   });
 });

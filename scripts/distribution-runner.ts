@@ -225,6 +225,9 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
     (days, w) => days + w.contributionDays.filter((d) => d.contributionCount > 0).length,
     0,
   );
+  const recentDaily = user.recent.contributionCalendar.weeks.flatMap((w) =>
+    w.contributionDays.map((d) => d.contributionCount),
+  );
   return {
     login: user.login,
     name: user.name,
@@ -241,6 +244,7 @@ async function fetchPayload(login: string): Promise<RawPayload | null> {
     recentIssues: user.recent.totalIssueContributions,
     recentRestricted: user.recent.restrictedContributionsCount,
     recentActiveDays,
+    recentDaily,
     lifetimeContributions,
     years: [], // per-year breakdown feeds awards, not scoring — the runner only scores
   };

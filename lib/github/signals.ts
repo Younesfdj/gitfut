@@ -1,9 +1,31 @@
 import type { RawPayload } from "./client";
 import { rankLanguages } from "./languages";
-import type { Signals } from "@/lib/scoring/types";
+import type { Signals, YearBreakdown } from "@/lib/scoring/types";
 
 const YEAR_MS = 31557600000;
 const yearOf = (iso: string) => (iso ? new Date(iso).getUTCFullYear() : null);
+
+// Judged on the daily calendar, not the 365-day totals: a whole-year window both
+// smothers a fresh burst and keeps a long-finished one "recent" for up to a year.
+const SPIKE_DAYS = 90;
+const SPIKE_FACTOR = 2;
+const SPIKE_MIN = 30; // a handful of commits after a quiet spell isn't a burst
+const yearSum = (y: YearBreakdown) => y.commits + y.prs + y.reviews + y.issues + y.restricted;
+
+// Usual pace = the faster of the rest of the last year and the lifetime
+// per-active-year average (completed years with any activity), so a return to
+// form after a quiet spell doesn't read as a burst.
+export function isRecentSpike(daily: number[], years: YearBreakdown[], now = Date.now()): boolean {
+  const recent = daily.slice(-SPIKE_DAYS).reduce((a, b) => a + b, 0);
+  if (recent < SPIKE_MIN) return false;
+  const prior = daily.slice(0, -SPIKE_DAYS);
+  const priorRate = prior.length ? prior.reduce((a, b) => a + b, 0) / prior.length : 0;
+  const currentYear = new Date(now).getUTCFullYear();
+  const past = years.filter((y) => y.year < currentYear && yearSum(y) > 0);
+  const lifetimeRate = past.length ? past.reduce((s, y) => s + yearSum(y), 0) / (past.length * 365) : 0;
+  const usual = Math.max(priorRate, lifetimeRate) * Math.min(SPIKE_DAYS, daily.length);
+  return recent > SPIKE_FACTOR * usual;
+}
 
 // Maps the (already real, already flattened) GraphQL payload onto the scoring
 // signals. No estimation — every field traces back to a GitHub number.
@@ -35,7 +57,7 @@ export function signalsFromPayload(p: RawPayload, now = Date.now()): Signals {
   const recent_contributions =
     p.recentCommits + p.recentPRs + p.recentReviews + p.recentIssues + p.recentRestricted;
   const total_contributions_lifetime = p.lifetimeContributions;
-  const recent_spike = recent_contributions > 2 * (total_contributions_lifetime / Math.max(active_years, 1));
+  const recent_spike = isRecentSpike(p.recentDaily, p.years, now);
 
   return {
     login: p.login,
